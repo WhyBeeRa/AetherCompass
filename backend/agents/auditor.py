@@ -6,26 +6,22 @@ from models import TrustScore, AuditLog, ToolMetrics
 AUDITOR_SYSTEM_PROMPT = """
 Role: You are the Chief Auditor of Aether. Your sole purpose is to doubt, verify, and validate every piece of data entering the "Single Source of Truth."
 
-Objective: Protect the platform from marketing manipulation, fake reviews, and outdated performance data.
+Objective: Protect the platform from marketing manipulation, fake reviews, and outdated performance data. Give precise, objective numerical ratings based on fixed parameters.
 
 1. Fraud & Bias Detection:
-Analyze user reviews for "Artificial Positivity." Flag any content that uses excessive superlatives without technical specifics.
-Check for "Review Bombing" patterns (sudden spikes in 5-star or 1-star ratings).
+Analyze text and metadata for "Artificial Positivity." If a tool's description uses excessive superlatives (e.g. "revolutionary", "game-changing") without concrete technical specifics, penalize its score immediately.
+Check for "Review Bombing" or inorganic sentiment patterns.
 
-2. Identity Validation:
-Cross-reference reviewer metadata with professional profiles (LinkedIn/GitHub).
-Prioritize insights from "Verified Builders" over anonymous users.
+2. Objective Scoring (The Rating):
+You must evaluate the tool across fixed parameters: True Capability, Speed/Performance, Price-to-Value, and Output Quality.
+Do not accept generalized statements. If a tool claims to be "fast", demand context. If it is slow, deduct points harshly. Your final verdict drives an objective 0-100 trust score.
 
-3. Performance Drift Monitoring:
-Trigger periodic "Pulse Checks" on tools. If the current output quality deviates by more than 15% from the initial Lab analysis, mark the tool as "Volatile" and update its score.
-
-4. Conflict Resolution:
-If the official documentation claims a feature that the Scout Agent cannot find evidence for in the real world, flag the tool for "Manual Audit."
+3. The "Cons" Mandate:
+You MUST find real, technical, or practical limitations for EVERY tool. Even the best tools have architectural trade-offs, pricing issues, or steep learning curves. If you cannot find a flaw, you are not looking hard enough. Describe these flaws brutally but professionally.
 
 Constraints:
-You are skeptical by nature.
+You are skeptical by nature. Zero marketing fluff allowed.
 Do not allow personal bias to influence the score, only data-driven evidence.
-If a tool fails more than two verification layers, its "Trust Badge" is revoked immediately.
 """
 
 class AuditorAgent:
@@ -68,7 +64,7 @@ class AuditorAgent:
         final_score = base_score - penalty
         return max(0.0, min(100.0, final_score))
 
-    async def audit_tool(self, tool_name: str, current_metrics: ToolMetrics, reviews: List[str] = [], hype_factor: bool = False) -> AuditLog:
+    async def audit_tool(self, tool_name: str, current_metrics: ToolMetrics, reviews: List[str] = [], hype_factor: bool = False, raw_limitations: List[str] = []) -> AuditLog:
         """
         Main audit entry point.
         """
@@ -76,41 +72,60 @@ class AuditorAgent:
         
         # 1. Identity & Fraud Check
         is_bot_attack = self._detect_textual_twins(reviews)
-        authenticity_score = 0.0 if is_bot_attack else 90.0 # Mocked high default if no bots
+        authenticity_score = 0.0 if is_bot_attack else 90.0
         
         penalty = 0.0
         audit_reason = "Routine Check Passed."
         action = "Verified"
         
         if is_bot_attack:
-            penalty = 50.0
-            audit_reason = "Flagged: Detected pattern of inorganic positive sentiment (Textual Twins)."
+            penalty += 40.0
+            audit_reason = "Flagged: Detected pattern of inorganic sentiment."
             action = "Flagged"
-            authenticity_score = 0.0 # Kill switch
+            authenticity_score = 0.0
             
-        # 1.5 Hype Penalty (New Logic)
+        # 1.5 Hype Penalty
         if hype_factor:
-            penalty += 50.0
-            audit_reason += " [Warning: High Levels of Marketing Hype Detected]"
+            penalty += 20.0
+            audit_reason += " [Warning: High Marketing Hype]"
             
-        # 2. Pulse Check (Drift)
-        # Mocking a "previous state" check. 
-        # In reality, we'd fetch previous metrics from DB.
-        stability_score = 100.0
-        # Simulating drift if speed is very low (just for logic demonstration)
-        if current_metrics.speed < 2:
-             stability_score = 60.0
-             audit_reason += " [Warning: Performance Instability Detected]"
+        # 2. Objective Metric Evaluation (Speed, Value, Accuracy)
+        # Using 1-5 scale metrics to derive a baseline score. 5 = 100%, 1 = 20%
+        # Weighting: Accuracy (40%), Value (30%), Speed (30%)
+        # Note: ease_of_use doesn't penalize capability directly, usually.
+        accuracy_norm = (current_metrics.accuracy / 5.0) * 100.0
+        value_norm = (current_metrics.value / 5.0) * 100.0
+        speed_norm = (current_metrics.speed / 5.0) * 100.0
+        
+        base_objective_score = (accuracy_norm * 0.4) + (value_norm * 0.3) + (speed_norm * 0.3)
+        
+        # Penalize if metrics are critically low
+        if current_metrics.speed <= 2:
+             audit_reason += " [Critique: Extremely slow processing speed observed.]"
+             penalty += 15.0
+        if current_metrics.value <= 2:
+             audit_reason += " [Critique: Price-to-Value ratio implies it is overpriced.]"
+             penalty += 15.0
+
+        # Penalize based on severe limitations from crawler
+        for limit in raw_limitations:
+            if "not allow" in limit.lower() or "enterprise only" in limit.lower() or "struggles" in limit.lower():
+                penalty += 5.0 
 
         # 3. Evidence Quality (Derived from Scout/Lab findings generally)
-        # Mocked for now based on metrics availability
-        evidence_quality = 85.0
+        evidence_quality = base_objective_score
 
         # Calculate Final Trust Score
-        total_trust = self._calculate_score(authenticity_score, stability_score, evidence_quality, penalty)
+        total_trust = self._calculate_score(authenticity_score, base_objective_score, evidence_quality, penalty)
         
+        # Enforce Real Limitations output logic
+        if len(raw_limitations) == 0:
+             penalty += 10.0 # Silent penalty for finding absolutely zero flaws, very suspicious.
+             total_trust = max(0.0, total_trust - 10.0)
+             audit_reason += " [Warning: Suspiciously flawless, applying skeptical deduction.]"
+
         # Logic for Revocation
-        if total_trust < 50:
+        if total_trust < 55:
              action = "Badge Revoked" if action != "Flagged" else action
         
         trust_model = TrustScore(

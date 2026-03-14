@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { ShieldCheck, Activity, Box, GitBranch, Coins, Zap, ArrowRight } from 'lucide-react';
+import LiveMonitorWidget from '../components/LiveMonitorWidget';
 
 export default function Home({ setAppError }) {
     const [query, setQuery] = useState('');
@@ -98,20 +100,26 @@ export default function Home({ setAppError }) {
 
                 {/* מצב 1: הצעות לפרומפטים (Idle State) */}
                 {!hasResults && !isSearching && (
-                    <div className="flex flex-wrap items-center justify-center gap-3 mb-10 w-full animate-in fade-in duration-500 delay-150">
-                        {[
-                            "יצירת תמונות מציאותיות וריאליסטיות",
-                            "בניית מצגת משקיעים מתוך טקסט",
-                            "דיבוג שגיאות עמוקות בשרת (Backend)",
-                        ].map((prompt, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setQuery(prompt)}
-                                className="px-5 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-md text-white/70 hover:bg-white/5 backdrop-blur-md hover:text-white hover:border-white/30 text-sm font-semibold transition-all shadow-sm"
-                            >
-                                {prompt}
-                            </button>
-                        ))}
+                    <div className="w-full">
+                        <div className="w-full mb-8">
+                           <LiveMonitorWidget />
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center justify-center gap-3 mb-10 w-full animate-in fade-in duration-500 delay-150">
+                            {[
+                                "יצירת תמונות מציאותיות וריאליסטיות",
+                                "בניית מצגת משקיעים מתוך טקסט",
+                                "דיבוג שגיאות עמוקות בשרת (Backend)",
+                            ].map((prompt, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setQuery(prompt)}
+                                    className="px-5 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-md text-white/70 hover:bg-white/5 backdrop-blur-md hover:text-white hover:border-white/30 text-sm font-semibold transition-all shadow-sm"
+                                >
+                                    {prompt}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -210,6 +218,49 @@ export default function Home({ setAppError }) {
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Commander Section (Pro Highlights) */}
+                {!hasResults && !isSearching && (
+                    <div className="w-full mt-24 mb-24 animate-in fade-in duration-1000 delay-300">
+                        <div className="text-center mb-16">
+                            <span className="text-emerald-400 font-bold uppercase tracking-[0.3em] text-[10px] mb-4 block">
+                                Beyond Search: Enterprise Grade
+                            </span>
+                            <h2 className="text-3xl md:text-4xl font-black text-white">
+                                הכלים של ה-<span className="text-emerald-500">Commanders</span>
+                            </h2>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {[
+                                { title: 'Playground', icon: <Box className="w-5 h-5" />, desc: 'השקיעו בשני מודלים במקביל וראו מי מהם באמת מתאים לכם לפני החיווי.', path: '/playground', color: 'border-emerald-500/20 text-emerald-400 bg-emerald-500/5' },
+                                { title: 'The Pulse', icon: <Activity className="w-5 h-5" />, desc: 'דאטה חי על Latency וביצועי API של הספקים המובילים בעולם.', path: '/pulse', color: 'border-rose-500/20 text-rose-400 bg-rose-500/5' },
+                                { title: 'AI Architect', icon: <GitBranch className="w-5 h-5" />, desc: 'בניית שרשראות עבודה (Workflows) מורכבות על בסיס נתוני המעבדה.', path: '/architect', color: 'border-indigo-500/20 text-indigo-400 bg-indigo-500/5' },
+                                { title: 'Optimizer', icon: <Coins className="w-5 h-5" />, desc: 'חסוך מאות שקלים בחודש בזיהוי כפילויות במחסנית הכלים שלך.', path: '/optimizer', color: 'border-yellow-500/20 text-yellow-400 bg-yellow-500/5' }
+                            ].map((feature, idx) => (
+                                <a 
+                                    href={feature.path} 
+                                    key={idx} 
+                                    className={`group p-8 rounded-3xl border ${feature.color} backdrop-blur-md transition-all hover:-translate-y-2 hover:shadow-2xl relative overflow-hidden`}
+                                >
+                                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none group-hover:bg-white/10 transition-all"></div>
+                                    <div className="mb-6 flex justify-between items-center">
+                                        {feature.icon}
+                                        <Zap className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <h3 className="text-lg font-black text-white mb-2">{feature.title}</h3>
+                                    <p className="text-white/40 text-xs font-medium leading-relaxed">{feature.desc}</p>
+                                </a>
+                            ))}
+                        </div>
+                        
+                        <div className="mt-12 text-center">
+                            <a href="/pricing" className="inline-flex items-center gap-2 text-white/40 hover:text-emerald-400 text-xs font-black uppercase tracking-widest transition-all">
+                                גלה את כל הפיצ'רים של Aether Pro <ArrowRight className="w-3 h-3" />
+                            </a>
+                        </div>
                     </div>
                 )}
 

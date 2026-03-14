@@ -7,3 +7,5 @@ praw
 PyGithub
 openai
 google-generativeai
+numpy
+firebase-admin

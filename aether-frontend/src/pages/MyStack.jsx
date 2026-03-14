@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bookmark, LayoutGrid, List, Search, ArrowUpRight, FolderHeart, Trash2 } from 'lucide-react';
 
 export default function MyStack() {
     const [viewMode, setViewMode] = useState('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [savedTools, setSavedTools] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [, setIsLoading] = useState(false);
 
     const API_BASE = "http://localhost:8000";
 

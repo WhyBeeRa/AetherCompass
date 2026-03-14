@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent))
 
 from models import (
-    LabAnalysis, ToolMetrics, VisualQuality, GalleryItem, AuditLog, IntentMapping
+    LabAnalysis, ToolMetrics, VisualQuality, GalleryItem, AuditLog, IntentMapping, MeasurementProof
 )
 from persistence import AetherVault
 
@@ -19,9 +19,13 @@ def run_seed():
         tool_name="Gamma AI",
         metrics=ToolMetrics(
             accuracy=4, speed=5, value=5, ease_of_use=5,
+            skill_multiplier=5, hallucination_score=4,
             learning_curve="קל מאוד",
             pricing="Freemium (קרדיטים)",
-            integration="ייצוא ל-PDF / Web"
+            integration="ייצוא ל-PDF / Web",
+            latency_label="5-10s",
+            cost_label="Free tier / $15 mo",
+            privacy_grade="B+"
         ),
         visual_quality=VisualQuality.HIGH,
         job_to_be_done=["מצגות", "בניית מצגות משקיעים"],
@@ -33,7 +37,15 @@ def run_seed():
         executive_summary="התאמה מושלמת לכוונת המשתמש: מייצר מצגות משקיעים מטקסט בתוך שניות עם עיצוב מובנה. מיועד למי שרוצה לדלג על עיצוב ידני ולהתמקד בתוכן.",
         pros=["מהירות: יצירת דראפט ראשוני בשניות", "עיצוב טבעי: פלטפורמה הדואגת לחוויה ויזואלית מצוינת"],
         cons=["התאמה אישית: קשה לעצב פיקסל-פרפקט פריטים מסוימים", "תבניות מוגבלות: יכול לחזור על עצמו למשתמשים מתקדמים"],
-        use_cases=["מצגות משקיעים (Pitch Decks)", "הדרכות מוצר", "סיכומי פגישות ויזואליים"]
+        use_cases=["מצגות משקיעים (Pitch Decks)", "הדרכות מוצר", "סיכומי פגישות ויזואליים"],
+        measurement_proofs=[
+            MeasurementProof(
+                scenario="בניית מצגת למותג קפה אורגני",
+                prompt="Create a 10-slide deck for 'EarthBrew', a sustainable organic coffee brand focusing on direct-trade and carbon-neutral shipping.",
+                output="[Generated 10 slides with professional layouts, specific sections for 'Our Mission', 'Direct Trade Impact', and financial projections. Visuals included coffee farm backgrounds.]",
+                metrics_captured={"latency": "8.4s", "slides_count": 10, "design_coherence": "High"}
+            )
+        ]
     )
     
     gamma_gallery = [
@@ -52,9 +64,13 @@ def run_seed():
         tool_name="Cursor",
         metrics=ToolMetrics(
             accuracy=5, speed=5, value=5, ease_of_use=3,
+            skill_multiplier=5, hallucination_score=5,
             learning_curve="מיועד למפתחים",
             pricing="תשלום חודשי ($20)",
-            integration="VS Code / GitHub Projects"
+            integration="VS Code / GitHub Projects",
+            latency_label="Instant (Streaming)",
+            cost_label="$0.02 / task",
+            privacy_grade="Enterprise Ready"
         ),
         visual_quality=VisualQuality.HIGH,
         job_to_be_done=["פיתוח קוד", "כתיבת אפליקציות"],
@@ -66,7 +82,21 @@ def run_seed():
         executive_summary="הכלי שכבש את קהילת המפתחים. עורך קוד מבוסס בינה מלאכותית מלאה, שנבנה על התשתית של VS Code אבל מבין את התיקייה כולה.",
         pros=["הקשר רחב: מבין את כל מאגר הקוד (Codebase)", "חוויה חלקה: UI טבעי בתוך סביבת עבודה מוכרת"],
         cons=["קהל יעד: לא מתאים להדיוטות / No-code", "פרטיות: רגישות לחברות שדורשות on-prem"],
-        use_cases=["פיתוח Full Stack", "דיבוג באגים (Debugging)", "תיעוד אלקטרוני ושיפור מאגרי קוד"]
+        use_cases=["פיתוח Full Stack", "דיבוג באגים (Debugging)", "תיעוד אלקטרוני ושיפור מאגרי קוד"],
+        measurement_proofs=[
+            MeasurementProof(
+                scenario="כתיבת שירות API ב-FastAPI",
+                prompt="Write a complete FastAPI endpoint that handles user registration with Pydantic validation and password hashing using passlib.",
+                output="[Code generated: import FastAPI, User model with EmailStr, registration endpoint with @app.post, bcrypt hashing implementation. Zero syntax errors.]",
+                metrics_captured={"latency": "1.2s", "hallucination_detected": "Zero", "compilation": "Success"}
+            ),
+            MeasurementProof(
+                scenario="תיקון באג ב-React useEffect",
+                prompt="Find and fix the infinite loop in this component: [provided code with missing dependency array]",
+                output="[Identified missing dependency array. Added [data] to dependency list. Explained why the loop was happening.]",
+                metrics_captured={"latency": "0.8s", "reasoning_accuracy": "100%"}
+            )
+        ]
     )
     
     cursor_gallery = [
@@ -85,9 +115,13 @@ def run_seed():
         tool_name="Midjourney",
         metrics=ToolMetrics(
             accuracy=4, speed=3, value=4, ease_of_use=2,
+            skill_multiplier=4, hallucination_score=5,
             learning_curve="קשה",
             pricing="תשלום חודשי ($10-$30)",
-            integration="Discord / Web Alpha"
+            integration="Discord / Web Alpha",
+            latency_label="~60s",
+            cost_label="$0.05 / GPU hr",
+            privacy_grade="Public / Stealth mode"
         ),
         visual_quality=VisualQuality.HIGH,
         job_to_be_done=["יצירת תמונות", "אמנות AI", "עיצוב ויזואלי"],
@@ -99,7 +133,15 @@ def run_seed():
         executive_summary="פלטפורמת יצירת התמונות המתקדמת בעולם מבחינה אמנותית. מניבה אסתטיקה ברמת אולפן אבל מצריכה שליטה בפרמטרים והבנה כיצד לכתוב רצפט מדויק.",
         pros=["איכות צילום: הפלטפורמה המובילה לפוטו-ריאליזם", "סגנון אמנותי: מגוון אדיר של השפעות מציירים, במאים ורזולוציות"],
         cons=["ממשק: דורש שימוש בדיסקורד או באתר אלפא לחלק מהמשתמשים", "עקומת למידה: שימוש בפרמטרים מורכבים (--v 6.0, --ar)"],
-        use_cases=["קונספט ארט לסדרות ומשחקים", "צילום מוצר לחנויות E-commerce", "תמונות אווירה לשיווק בלוגים"]
+        use_cases=["קונספט ארט לסדרות ומשחקים", "צילום מוצר לחנויות E-commerce", "תמונות אווירה לשיווק בלוגים"],
+        measurement_proofs=[
+            MeasurementProof(
+                scenario="צילום אופנה עתידני",
+                prompt="Cyberpunk fashion editorial, model in neon Tokyo, shot on Sony A7R IV, 85mm f/1.4, cinematic lighting --style raw --v 6.0",
+                output="[Generated 4 high-resolution images. Exceptional skin texture and light scattering. Consistent cyberpunk aesthetic.]",
+                metrics_captured={"generation_time": "52s", "aesthetic_score": "9.8/10", "prompt_adherence": "Extreme"}
+            )
+        ]
     )
     
     mj_gallery = [

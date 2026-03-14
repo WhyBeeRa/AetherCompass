@@ -18,6 +18,7 @@ You MUST extract the data in a STRICT JSON format that matches the following sch
 Required JSON Structure:
 {
     "tool_name": "Name of the tool",
+    "source_url": "The true original URL where the tool was found or its official website",
     "job_to_be_done": ["Category 1", "Category 2"],
     "limitations": ["Limitation 1", "Limitation 2"],
     "privacy_policy": "Summary of privacy policy (e.g., trains on data, enterprise only, no training)",
@@ -61,7 +62,9 @@ async def analyze_tool_with_gemini(tool_info: str):
     prompt = f"Analyze the following AI tool information:\n\n{tool_info}"
     
     attempt = 1
-    while True:
+    base_wait = 5
+    max_wait = 60
+    while attempt <= 7:
         try:
             print(f"Attempting to call Gemini API (attempt {attempt})...")
             # Using synchronous call in a thread for the new SDK just in case async client is tricky
@@ -79,13 +82,17 @@ async def analyze_tool_with_gemini(tool_info: str):
             break
         except Exception as e:
             if "429" in str(e) or "Quota" in str(e) or "ResourceExhausted" in type(e).__name__:
-                wait_time = 15  # Strict 15s loop per instructions to prevent failing
-                print(f"Rate limit hit (429). Waiting {wait_time} seconds before retry {attempt}...")
+                wait_time = min(base_wait * (2 ** (attempt - 1)), max_wait)
+                print(f"Rate limit hit (429). Exponential Backoff: Waiting {wait_time} seconds before retry {attempt}...")
                 await asyncio.sleep(wait_time)
                 attempt += 1
             else:
                 print(f"Failed Gemini call with non-rate-limit error: {e}")
                 return None
+    
+    if attempt > 7:
+        print("Max retries reached for Gemini call.")
+        return None
     
     try:
         data = json.loads(response.text)
@@ -94,15 +101,13 @@ async def analyze_tool_with_gemini(tool_info: str):
         print(f"Failed to decode JSON from Gemini: {e}\nResponse: {response.text}")
         return None
 
-async def run_daily_crawl(target_tools: list[str]):
-    print(f"--- Starting Aether Daily Crawl: {datetime.now()} ---")
-    vault = AetherVault()
-    
-    for tool_raw_info in target_tools:
+async def process_single_tool(tool_raw_info: str, vault: AetherVault, semaphore: asyncio.Semaphore):
+    async with semaphore:
         result = await analyze_tool_with_gemini(tool_raw_info)
         
         if result:
             tool_name = result.get("tool_name", "Unknown")
+            source_url = result.get("source_url")
             
             # Map metrics
             m_data = result.get("metrics", {})
@@ -142,6 +147,10 @@ async def run_daily_crawl(target_tools: list[str]):
                 source_findings_id="daily_crawler"
             )
             
+            # Provide an external reference inside the pipeline if source exists
+            if source_url and tool_name != "Unknown":
+                analysis.executive_summary += f" [Source: {source_url}]"
+
             # Calculate an aggregate trust score based on intents
             if intents_mapped:
                 trust_score = sum(i.success_score for i in intents_mapped) / len(intents_mapped)
@@ -160,22 +169,44 @@ async def run_daily_crawl(target_tools: list[str]):
                 tool_name=tool_name,
                 analysis=analysis,
                 trust_score=trust_score,
-                gallery=[], # Gallery fetching would be a separate image ingestion step
+                gallery=[], # Gallery fetching would be a separate image ingestion step (persistence.py protects existing)
                 audit_log=audit
             )
             print(f"Successfully ingested & deep-mapped: {tool_name}")
             
-        print("Waiting 16 seconds to respect rate limits...")
-        await asyncio.sleep(16)
+        # Respect rate limits even with concurrency
+        await asyncio.sleep(2)
+
+async def run_daily_crawl(target_tools: list[str]):
+    print(f"--- Starting Aether Daily Crawl: {datetime.now()} ---")
+    vault = AetherVault()
+    
+    # Process up to 5 tools concurrently
+    semaphore = asyncio.Semaphore(5)
+    
+    tasks = [process_single_tool(info, vault, semaphore) for info in target_tools]
+    await asyncio.gather(*tasks)
             
     print("--- Daily Crawl Complete ---")
 
 if __name__ == "__main__":
-    # Example raw inputs simulating scraped data from a newsletter or API
+    # Top 50 AI Tools List
+    target_tools_list = [
+        "ChatGPT", "Claude 3", "Midjourney", "Jasper", "Runway",
+        "Perplexity", "GitHub Copilot", "Cursor", "ElevenLabs", "Zapier",
+        "Synthesia", "Notion AI", "DALL-E 3", "Sora", "Gemini",
+        "Mistral", "Llama 3", "Hugging Face", "Leonardo AI", "Copy.ai",
+        "Writesonic", "Descript", "Canva Magic Studio", "Fireflies.ai", "Otter.ai",
+        "Gamma", "Tome", "Beautiful.ai", "Veed", "InVideo",
+        "Murf AI", "PlayHT", "Tabnine", "Amazon Q", "Devin",
+        "AutoGPT", "AgentGPT", "Character.ai", "Pi", "Harvey",
+        "Grammarly", "QuillBot", "Wordtune", "Stable Diffusion", "Krea",
+        "Magnific", "Pika", "Suno", "Udio", "Phind"
+    ]
+    
     simulated_scraping_feed = [
-        "HeyGen is an AI video generation platform that lets you create realistic AI avatars. It is excellent for marketing videos and tutorials. However, avatars can sometimes look slightly stiff and generation takes time. They state enterprise accounts do not have their data used for training model.",
-        "Make.com is a powerful visual workflow automation platform. It connects hundreds of apps, APIs, and AI models via drag and drop. While incredibly flexible, it requires understanding basic API and data structures which has a learning curve. They comply with GDPR and enterprise privacy standards.",
-        "Luma Dream Machine is a highly capable AI video generator capable of producing extremely realistic 5-second video clips from text or image prompts. The physics are amazing but it currently struggles with fine text generation. Data policy allows opting out of training."
+        f"Analyze the AI tool '{tool}'. Extract its category, real limitations, objective pros and cons, pricing model, speed, ease of use, accuracy, and user intents it solves. Find the true project or company URL and place it in the source_url field. Provide a highly objective evaluation."
+        for tool in target_tools_list
     ]
     
     asyncio.run(run_daily_crawl(simulated_scraping_feed))

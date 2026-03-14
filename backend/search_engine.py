@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import numpy as np
 import google.generativeai as genai
 from typing import List, Dict
 from pydantic import BaseModel
@@ -51,55 +52,130 @@ class AetherSearchEngine:
         )
         self.vault = AetherVault()
 
+    async def _get_embedding(self, text: str) -> List[float]:
+        """Fetch the embedding for a given text from Gemini."""
+        try:
+            # We use gemini-embedding-001 as the stable multilingual model
+            result = await asyncio.to_thread(
+                genai.embed_content,
+                model="models/gemini-embedding-001",
+                content=text,
+                task_type="retrieval_query"
+            )
+            return result['embedding']
+        except Exception as e:
+            print(f"[SearchEngine] Error generating embedding: {e}")
+            return []
+
     async def semantic_search(self, query: str) -> List[Dict]:
-        tools = self.vault.search_tools("")
+        """
+        Hybrid Search:
+        1. Fast Keyword Search (SQLite LIKE)
+        2. Vector Semantic Search (Cosine Similarity)
+        3. Reciprocal Rank Fusion / Score Combining
+        """
+        tools = [dict(t) if not isinstance(t, dict) else t for t in self.vault.search_tools("")] # Get all tools for vector search
         if not tools:
             return []
 
-        # Prepare context (strip heavy fields like base64 images to save tokens)
-        tools_context = []
+        # FAST PATH: Literal matches (e.g. searching exact names)
+        keyword_results = [dict(t) if not isinstance(t, dict) else t for t in self.vault.search_tools(query)]
+        keyword_tool_names = {t["tool_name"].lower() for t in keyword_results}
+        
+        # If the query is very short, just rely on keyword
+        if len(keyword_results) > 0 and len(query.split()) <= 2:
+            for t in keyword_results:
+                 t["match_reason"] = f"התאמה ישירה למילת החיפוש '{query}'"
+                 t["relevance_score"] = 90
+            keyword_results.sort(key=lambda x: x.get("trust_score", 0), reverse=True)
+            return keyword_results[:5]
+
+        # VECTOR SEARCH PATH
+        query_embedding = await self._get_embedding(query)
+        
+        vector_scores = {}
+        if query_embedding:
+            # Convert query to numpy array
+            q_vec = np.array(query_embedding)
+            q_norm = np.linalg.norm(q_vec)
+            
+            if q_norm > 0:
+                for t in tools:
+                    emb = t.get("embedding") # get_tool / search_tools already parsed this from JSON
+                    if emb:
+                        t_vec = np.array(emb)
+                        t_norm = np.linalg.norm(t_vec)
+                        if t_norm > 0:
+                            # Cosine Similarity: dot(A, B) / (norm(A) * norm(B))
+                            sim = np.dot(q_vec, t_vec) / (q_norm * t_norm)
+                            # Convert similarity to a 0-100 score
+                            score = int((sim + 1) * 50) # map [-1, 1] to [0, 100]
+                            # Boost slightly if it's high similarity
+                            score = min(100, int(score * (1 + (sim * 0.2)))) if sim > 0.5 else score
+                            vector_scores[t["tool_name"].lower()] = score
+                            
+        # HYBRID FUSION
+        final_scores = []
         for t in tools:
-            analysis = t.get("analysis", {})
-            intents = analysis.get("intents_mapped", [])
-            tools_context.append({
-                "tool_name": t.get("tool_name"),
-                "executive_summary": analysis.get("executive_summary", ""),
-                "trust_score": t.get("trust_score"),
-                "intents_mapped": intents
-            })
-
-        prompt = f"User Query: {query}\n\nAvailable Tools in Vault:\n{json.dumps(tools_context, ensure_ascii=False)}"
-
-        try:
-            # We add an explicit timeout at the Google API level as well if supported by the client,
-            # but wrapping it in asyncio.wait_for ensures the thread itself doesn't hang forever.
-            response = await asyncio.wait_for(
-                asyncio.to_thread(self.model.generate_content, prompt),
-                timeout=55.0  # 55 seconds to allow FastAPI to handle the 60s frontend timeout safely
-            )
+            tool_name_lower = t["tool_name"].lower()
             
-            data = json.loads(response.text)
-            ranked_results = data.get("results", [])
+            # Base Vector Score (if embedding existed and calculation worked)
+            v_score = vector_scores.get(tool_name_lower, 0)
             
-            final_tools = []
-            for r in ranked_results:
-                tool_data = next((t for t in tools if t["tool_name"].lower() == r.get("tool_name", "").lower()), None)
-                if tool_data:
-                    # Inject the match reason specifically for the UI to show
-                    tool_data["match_reason"] = r.get("match_reason", "התאמה נמצאה על בסיס כוונת המשתמש")
-                    tool_data["relevance_score"] = r.get("relevance_score", 0)
-                    final_tools.append(tool_data)
-                    
-            # Sort final tools by relevance score descending
-            final_tools.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
-            return final_tools
+            # Base Keyword Score
+            k_score = 0
+            if tool_name_lower in keyword_tool_names:
+                k_score = 60 # Standard keyword match
+                # Exact name match gets highest keyword score
+                if query.lower() in tool_name_lower or tool_name_lower in query.lower():
+                    k_score = 90
+            
+            # Combine - we take the max of either, plus a small bump if BOTH hit
+            final_score = max(v_score, k_score)
+            if v_score > 60 and k_score > 0:
+                 final_score = min(100, final_score + 10)
+                 
+            # Add Trust Score signal (very small influence: 0-5 points max)
+            trust_bump = (t.get("trust_score", 0) / 100.0) * 5
+            final_score = min(100, int(final_score + trust_bump))
+                 
+            if final_score > 65: # Threshold for relevance
+                final_scores.append((final_score, t))
+                
+        # Sort by final hybrid score
+        final_scores.sort(key=lambda x: x[0], reverse=True)
+        top_results = final_scores[:5]
+        
+        # Format the return objects
+        formatted_results = []
+        for score, t in top_results:
+             # If we relied solely on keyword, update the reason
+             if score == k_score and v_score < 60:
+                 reason = f"התאמה נמצאה על בסיס מילות מפתח ('{query}')"
+             else:
+                 # It's a semantic vector match
+                 reason = "התאמה נמצאה על בסיס חיפוש סמנטי (וקטורי) לכוונתך"
+                 
+                 # Try to find a better specific reason from the tool's intents
+                 analysis = t.get("analysis", {})
+                 intents = analysis.get("intents_mapped", [])
+                 for intent in intents:
+                      desc = intent.get("intent_description", "")
+                      # If the vector algorithm matched highly, the primary intent is usually why
+                      if desc:
+                           reason = f"התאמה מדויקת לכוונת: {desc}"
+                           break
+                           
+             t["match_reason"] = reason
+             t["relevance_score"] = score
+             formatted_results.append(t)
+             
+        # FALLBACK: If hybrid search found literally nothing, return at least keyword search again if available
+        if not formatted_results and keyword_results:
+             for t in keyword_results:
+                 t["match_reason"] = "התאמה מהירה (לא נמצאה התאמה סמנטית מדויקת)"
+                 t["relevance_score"] = 50
+             keyword_results.sort(key=lambda x: x.get("trust_score", 0), reverse=True)
+             return keyword_results[:5]
 
-        except asyncio.TimeoutError:
-            print("[SearchEngine] Gemini API request timed out after 55 seconds.")
-            raise Exception("Search engine timed out analyzing complex intent. Please try again.")
-        except json.JSONDecodeError as e:
-            print(f"[SearchEngine] Failed to parse Gemini JSON: {e}")
-            raise Exception("Search engine returned invalid formatting. Please try again.")
-        except Exception as e:
-            print(f"[SearchEngine] Critical Error: {e}")
-            raise Exception(f"Search engine error: {str(e)}")
+        return formatted_results

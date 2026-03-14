@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Shield, ExternalLink, Sparkles, Zap } from "lucide-react";
 
-export function SponsoredCard({ title, source, summary, trust_score, media_url, style_tags }) {
+export function SponsoredCard({ title, source, summary, trust_score, media_url }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}

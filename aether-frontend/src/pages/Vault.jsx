@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Clock, TrendingUp, CheckCircle, Search, Layers, Server, AlertCircle } from 'lucide-react';
+import { Shield, Clock, TrendingUp, CheckCircle, Search, Layers, Server, AlertCircle, Trash2, Loader2, Eye, EyeOff, Edit2, Check, Activity } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+import LiveMonitorWidget from '../components/LiveMonitorWidget';
 
 const Vault = ({ setAppError }) => {
     const navigate = useNavigate();
@@ -10,10 +12,16 @@ const Vault = ({ setAppError }) => {
     const queryParams = new URLSearchParams(location.search);
     const initialQuery = queryParams.get("q") || "";
 
+    const { currentUser, isAdmin } = useAuth();
     const [tools, setTools] = useState([]);
     const [stats, setStats] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState(initialQuery);
+    const [confirmDelete, setConfirmDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [editingPricing, setEditingPricing] = useState(null); // { name, currentPricing }
+    const [newPricingValue, setNewPricingValue] = useState("");
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         const fetchVaultData = async () => {
@@ -25,7 +33,9 @@ const Vault = ({ setAppError }) => {
                 const statsData = await statsRes.json();
                 setStats(statsData);
 
-                // Fetch all tools
+                // Fetch all tools (admins should see inactive ones too eventually, but search_tools filters by default)
+                // For now, let's keep it simple. Admins see everything if we pass a flag? 
+                // Let's stick to public for now, or update API if needed.
                 const toolsRes = await fetch('http://127.0.0.1:8000/vault/search?q=');
                 if (!toolsRes.ok) throw new Error("Failed to fetch vault data");
                 const toolsData = await toolsRes.json();
@@ -40,6 +50,77 @@ const Vault = ({ setAppError }) => {
 
         fetchVaultData();
     }, [setAppError]);
+
+    const handleToggleStatus = async (toolName, currentStatus) => {
+        try {
+            setIsUpdating(true);
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`http://127.0.0.1:8000/admin/vault/toggle/${encodeURIComponent(toolName.toLowerCase())}?active=${!currentStatus}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error("Toggle failed");
+            
+            setTools(prev => prev.map(t => t.tool_name === toolName ? { ...t, is_active: !currentStatus } : t));
+        } catch (err) {
+            if (setAppError) setAppError("שגיאה בעדכון סטטוס הכלי.");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleUpdatePricing = async (toolName) => {
+        try {
+            setIsUpdating(true);
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`http://127.0.0.1:8000/admin/vault/pricing/${encodeURIComponent(toolName.toLowerCase())}?pricing=${encodeURIComponent(newPricingValue)}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error("Pricing update failed");
+            
+            setTools(prev => prev.map(t => t.tool_name === toolName ? { 
+                ...t, 
+                analysis: { ...t.analysis, metrics: { ...t.analysis.metrics, pricing: newPricingValue } } 
+            } : t));
+            setEditingPricing(null);
+        } catch (err) {
+            if (setAppError) setAppError("שגיאה בעדכון המחיר.");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleDelete = async (toolName) => {
+        if (!window.confirm(`האם אתה בטוח שברצונך למחוק את ${toolName} לצמיתות מהמאגר?`)) {
+            return;
+        }
+        
+        try {
+            setIsDeleting(true);
+            const token = await currentUser.getIdToken();
+            const res = await fetch(`http://127.0.0.1:8000/admin/vault/tool/${encodeURIComponent(toolName.toLowerCase())}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.detail || "Deletion failed");
+            }
+
+            // Refresh tools
+            setTools(prev => prev.filter(t => t.tool_name !== toolName));
+            setConfirmDelete(null);
+        } catch (err) {
+            console.error("Delete error:", err);
+            if (setAppError) setAppError(err.message || "שגיאה במחיקת הכלי.");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const categoryKeywords = {
         'פיתוח קוד': ['code', 'dev', 'react', 'tailwind', 'program', 'cursor', 'v0', 'github'],
@@ -92,6 +173,9 @@ const Vault = ({ setAppError }) => {
                     </p>
                 </div>
 
+                {/* Live Monitoring Widget */}
+                <LiveMonitorWidget />
+
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group">
@@ -143,6 +227,25 @@ const Vault = ({ setAppError }) => {
                             />
                         </div>
                     </div>
+                    
+                    {isAdmin && (
+                        <div className="p-4 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
+                                <Shield className="w-4 h-4" />
+                                Admin Panel
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    if(window.confirm("האם אתה בטוח שברצונך למחוק את כל הכלים המופיעים בתוצאות החיפוש? פעולה זו אינה ניתנת לביטול!")) {
+                                        filteredTools.forEach(t => handleDelete(t.tool_name));
+                                    }
+                                }}
+                                className="px-4 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-all"
+                            >
+                                מחיקת כל התוצאות ({filteredTools.length})
+                            </button>
+                        </div>
+                    )}
 
                     <div className="overflow-x-auto">
                         {isLoading ? (
@@ -153,20 +256,63 @@ const Vault = ({ setAppError }) => {
                             <table className="w-full text-right text-sm">
                                 <thead>
                                     <tr className="bg-white/[0.02] border-b border-white/5 text-white/40 uppercase tracking-widest text-[0.65rem] font-medium">
+                                        {isAdmin && <th className="px-6 py-4 font-medium">ניהול</th>}
                                         <th className="px-6 py-4 font-medium">שם הכלי</th>
                                         <th className="px-6 py-4 font-medium">Trust Score</th>
                                         <th className="px-6 py-4 font-medium hidden md:table-cell">כוונות מרכזיות</th>
-                                        <th className="px-6 py-4 font-medium hidden sm:table-cell">דירוג קושי</th>
+                                        <th className="px-6 py-4 font-medium hidden sm:table-cell">מודל תמחור</th>
                                         <th className="px-6 py-4 font-medium lg:text-center">סטטוס אימות</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {filteredTools.map((tool, idx) => (
-                                        <tr key={idx} className="hover:bg-white/[0.02] transition-colors group cursor-pointer" onClick={() => navigate(`/tool/${tool.tool_name.toLowerCase().replace(/\s+/g, '-')}`)}>
+                                        <tr key={idx} className={`hover:bg-white/[0.02] transition-colors group cursor-pointer ${!tool.is_active ? 'opacity-50' : ''}`} onClick={() => navigate(`/tool/${tool.tool_name.toLowerCase().replace(/\s+/g, '-')}`)}>
+                                            {isAdmin && (
+                                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-2">
+                                                        <button 
+                                                            onClick={() => handleToggleStatus(tool.tool_name, tool.is_active)}
+                                                            className={`p-2 rounded-lg transition-all ${tool.is_active ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-red-400 hover:bg-red-400/10'}`}
+                                                            title={tool.is_active ? "הפוך ללא פעיל (Kill Switch)" : "הפוך לפעיל"}
+                                                        >
+                                                            {tool.is_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                                        </button>
+
+                                                        {confirmDelete === tool.tool_name ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <button 
+                                                                    onClick={() => handleDelete(tool.tool_name)}
+                                                                    disabled={isDeleting}
+                                                                    className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-all flex items-center gap-1"
+                                                                >
+                                                                    {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : "כן"}
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setConfirmDelete(null)}
+                                                                    className="text-white/40 hover:text-white transition-colors text-xs"
+                                                                >
+                                                                    לא
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => setConfirmDelete(tool.tool_name)}
+                                                                className="p-2 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                                                                title="מחק מהכספת"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            )}
                                             <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
-                                                <Link to={`/tool/${tool.tool_name.toLowerCase().replace(/\s+/g, '-')}`} className="hover:text-cyan-400 transition-colors">
-                                                    {tool.tool_name.charAt(0).toUpperCase() + tool.tool_name.slice(1)}
-                                                </Link>
+                                                <div className="flex flex-col">
+                                                    <Link to={`/tool/${tool.tool_name.toLowerCase().replace(/\s+/g, '-')}`} className="hover:text-cyan-400 transition-colors">
+                                                        {tool.tool_name.charAt(0).toUpperCase() + tool.tool_name.slice(1)}
+                                                    </Link>
+                                                    {!tool.is_active && <span className="text-[10px] text-red-400 uppercase font-bold">Inactive</span>}
+                                                </div>
                                                 {tool.trust_score >= 90 && (
                                                     <span className="px-2 py-0.5 rounded text-[0.6rem] uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                                                         Elite
@@ -203,7 +349,40 @@ const Vault = ({ setAppError }) => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 hidden sm:table-cell text-white/50 text-xs">
-                                                {tool.analysis?.metrics?.learning_curve || "N/A"}
+                                                {editingPricing?.name === tool.tool_name ? (
+                                                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                        <input 
+                                                            type="text" 
+                                                            value={newPricingValue}
+                                                            onChange={e => setNewPricingValue(e.target.value)}
+                                                            className="bg-white/10 border border-white/20 rounded px-2 py-1 w-24 text-white text-xs"
+                                                            autoFocus
+                                                        />
+                                                        <button 
+                                                            onClick={() => handleUpdatePricing(tool.tool_name)}
+                                                            className="p-1 hover:text-emerald-400"
+                                                        >
+                                                            <Check className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{tool.analysis?.metrics?.pricing || "N/A"}</span>
+                                                        {isAdmin && (
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingPricing({ name: tool.tool_name });
+                                                                    setNewPricingValue(tool.analysis?.metrics?.pricing || "");
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-cyan-400 transition-all"
+                                                                title="ערוך מודל תמחור"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 lg:text-center">
                                                 <div className="inline-flex items-center gap-1.5">

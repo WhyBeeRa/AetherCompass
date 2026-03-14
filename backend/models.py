@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, HttpUrl
-from typing import List, Optional, Dict
+from pydantic import BaseModel, Field, HttpUrl, field_validator, field_validator, field_validator
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
 
@@ -12,7 +12,15 @@ class IntentCategory(str, Enum):
     CODING_ASSISTANT = "coding_assistant"
     WRITING_AID = "writing_aid"
     ENTREPRENEURSHIP = "entrepreneurship"
+    COMMUNITY = "community"
     OTHER = "other"
+
+class Badge(str, Enum):
+    MODEL_SCOUT = "Model Scout"
+    LEAD_ARCHITECT = "Lead Architect"
+    EARLY_ADOPTER = "Early Adopter"
+    TRUTH_SEEKER = "Truth Seeker"
+    MASTER_VERIFIER = "Master Verifier"
 
 class UserIntent(BaseModel):
     """
@@ -103,10 +111,19 @@ class ToolMetrics(BaseModel):
     value: int = Field(..., ge=1, le=5, description="Cost vs Performance")
     ease_of_use: int = Field(..., ge=1, le=5, description="No-code vs Developer skills")
     
+    # Aether Audit - Phase 2026 Core Metrics
+    skill_multiplier: int = Field(default=3, ge=1, le=5, description="Ability to turn a junior into a senior output")
+    hallucination_score: int = Field(default=5, ge=1, le=5, description="Reliability vs Hallucinations (5 = Zero Hallucination)")
+    
     # UI Metadata for the 3-Card Drop & ToolDetails
     learning_curve: str = Field(default="בינוני", description="קל מאוד, בינוני, קשה, מיועד למפתחים")
     pricing: str = Field(default="Freemium", description="Freemium, תשלום חודשי, פתוח לכולם")
     integration: str = Field(default="Web / API", description="אינטגרציות מרכזיות, למשל Slack, Web, API מותאם")
+    
+    # Comparison Matrix Labels
+    latency_label: str = Field(default="2.4s", description="זמן תגובה ממוצע לתצוגה")
+    cost_label: str = Field(default="$0.01 / task", description="עלות מוערכת לביצוע משימה")
+    privacy_grade: str = Field(default="Enterprise Safe", description="דרגת פרטיות (למשל A, B, Enterprise Ready)")
 
     last_verified: datetime = Field(default_factory=datetime.now, description="Critical to track model drift")
 
@@ -118,6 +135,18 @@ class IntentMapping(BaseModel):
     intent_description: str = Field(..., description="E.g., 'Automating investor pitch decks from docs'")
     success_score: float = Field(..., ge=0, le=100, description="How well this tool specifically solves this intent")
     trade_off: Optional[str] = Field(None, description="The catch. E.g., 'Fast, but lacks granular design control'")
+
+class MeasurementProof(BaseModel):
+    """
+    Direct evidence of a tool's performance in a laboratory setting.
+    This is the 'Raw Data' that backs up the objective scores.
+    """
+    scenario: str = Field(..., description="e.g., 'Writing a Python FastAPI endpoint'")
+    prompt: str = Field(..., description="The exact input provided to the tool")
+    output: str = Field(..., description="The raw output received from the tool")
+    timestamp: datetime = Field(default_factory=datetime.now)
+    metrics_captured: Dict[str, Any] = Field(default_factory=dict, description="e.g., {'latency': '1.2s', 'tokens': 450}")
+
 
 class LabAnalysis(BaseModel):
     """
@@ -139,7 +168,11 @@ class LabAnalysis(BaseModel):
     cons: List[str] = Field(default_factory=list, description="Array of Cons with a title, e.g. 'Title: Description'")
     use_cases: List[str] = Field(default_factory=list, description="UI pills array")
     
+    # THE LAB: PROOF OF MEASUREMENT (Audit Logs)
+    measurement_proofs: List[MeasurementProof] = Field(default_factory=list, description="Raw data samples from direct testing")
+
     # Deep Intelligence Fields (Phase 7)
+
     limitations: List[str] = Field(default_factory=list, description="What the tool explicitly cannot do / struggles with")
     privacy_policy: Optional[str] = Field(default="Unknown", description="e.g. 'Trains on user data', 'Enterprise only'")
     social_proof: Optional[str] = Field(None, description="Summarized user/developer quote validating capability")
@@ -187,3 +220,91 @@ class GalleryItem(BaseModel):
     is_featured: bool = False
     trust_badge_visible: bool = Field(True, description="Only true if TrustScore > 70")
     audit_log_id: Optional[str] = None
+
+class ManualToolEntry(BaseModel):
+    name: str = Field(..., min_length=2)
+    description: str
+    pros: List[str]
+    cons: List[str]
+    use_cases: List[str] = Field(default_factory=list)
+    trust_score: int = Field(..., ge=10, le=100)
+    
+    # Extra fields required for internal DB conversion
+    intent_category: str
+    accuracy: int = Field(4, ge=1, le=5)
+    speed: int = Field(4, ge=1, le=5)
+    value: int = Field(4, ge=1, le=5)
+    ease_of_use: int = Field(4, ge=1, le=5)
+    skill_multiplier: int = Field(3, ge=1, le=5)
+    hallucination_score: int = Field(4, ge=1, le=5)
+    latency_label: str = "2.4s"
+    cost_label: str = "$0.01 / task"
+    privacy_grade: str = "Enterprise Safe"
+    pricing: str = "Freemium"
+    learning_curve: str = "בינוני"
+    visual_quality: str = "Mid"
+    image_url: Optional[str] = None
+    
+    # Comparison Fields
+    latency_label: str = "2.4s"
+    cost_label: str = "$0.01 / task"
+    privacy_grade: str = "Enterprise Safe"
+    integration: str = "Web / API"
+
+    @field_validator('pros', 'cons', 'use_cases', mode='before')
+    @classmethod
+    def split_and_clean(cls, v):
+        if isinstance(v, str):
+            # מפצל לפי פסיק, מנקה רווחים ומסנן מחרוזות ריקות
+            return [item.strip() for item in v.split(',') if item.strip()]
+        return v
+
+class UserProfile(BaseModel):
+    uid: str
+    email: str
+    display_name: Optional[str] = None
+    points: int = 0
+    elo: int = 1200
+    badges: List[Badge] = Field(default_factory=list)
+    contributions_count: int = 0
+    votes_count: int = 0
+    last_active: datetime = Field(default_factory=datetime.now)
+    is_pro: bool = False
+
+class EloBattleVote(BaseModel):
+    tool_a: str
+    tool_b: str
+    winner: str # tool_name or "draw"
+    category: Optional[str] = "General"
+    reason: Optional[str] = Field(None, description="Why the winner was chosen")
+
+class SearchAnalytics(BaseModel):
+    query: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+    results_found: int
+    user_id: Optional[str] = None
+
+class VendorInsights(BaseModel):
+    tool_name: str
+    total_battles: int
+    win_rate: float
+    loss_reasons: List[Dict[str, Any]]
+    missed_searches: List[Dict[str, Any]]
+    competitor_comparison: List[Dict[str, Any]]
+
+class ToolContribution(BaseModel):
+    name: str
+    url: str
+    description: str
+
+class LiveMetric(BaseModel):
+    """
+    Real-time performance metrics for AI models.
+    """
+    tool_name: str
+    provider: str # OpenAI, Anthropic, etc.
+    latency_ms: float
+    hallucination_score: float # 0 to 100
+    timestamp: datetime = Field(default_factory=datetime.now)
+    status: str = "online" # online, slow, offline
+    comparison_vs_avg: Optional[float] = None # % difference vs others

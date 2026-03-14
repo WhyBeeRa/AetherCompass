@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Github, Compass } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 
 export default function Activation() {
     const navigate = useNavigate();
+    const { loginWithGoogle, currentUser } = useAuth();
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSent, setIsSent] = useState(false);
@@ -19,6 +21,24 @@ export default function Activation() {
             setIsSent(true);
         }, 1200);
     };
+
+    const handleGoogleLogin = async () => {
+        try {
+            await loginWithGoogle();
+            navigate('/');
+        } catch (error) {
+            alert("שגיאת התחברות מגוגל: " + error.message);
+            console.error("Login failed:", error);
+        }
+    };
+
+    useEffect(() => {
+        if (currentUser) {
+            // Only navigate on mount if already logged in, not tracking state changes vigorously 
+            navigate('/');
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[85vh] w-full rtl" dir="rtl">
@@ -49,7 +69,7 @@ export default function Activation() {
                 {!isSent ? (
                     <div className="flex flex-col gap-4">
                         {/* OAuth Buttons */}
-                        <button className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/5 backdrop-blur-md border border-white/20 rounded-xl text-white/80 font-medium hover:bg-white/5 backdrop-blur-md transition-all shadow-sm">
+                        <button onClick={handleGoogleLogin} className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/5 backdrop-blur-md border border-white/20 rounded-xl text-white/80 font-medium hover:bg-white/5 backdrop-blur-md transition-all shadow-sm">
                             <svg className="w-5 h-5" viewBox="0 0 24 24">
                                 <path
                                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
