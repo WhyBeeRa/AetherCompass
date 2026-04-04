@@ -28,7 +28,24 @@ from community_logic import calculate_elo_change, check_for_badges
 from models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
 
 app = FastAPI(title="Aeather API", description="Backend for the Agentic Grid", version="0.2.0")
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI()
+
+# זה החלק שאתה מוסיף/מעדכן:
+origins = [
+    "https://www.aethercompass.com",  # הכתובת של האתר שלך
+    "http://localhost:5173",          # מאפשר לך להמשיך לעבוד מקומית
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
