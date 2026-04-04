@@ -29,10 +29,6 @@ const AetherInsiders = lazy(() => import("./pages/AetherInsiders"));
 const EloBattle = lazy(() => import("./pages/EloBattle"));
 const Compare = lazy(() => import("./pages/Compare"));
 const VendorInsights = lazy(() => import("./pages/VendorInsights"));
-const Playground = lazy(() => import("./pages/Playground"));
-const Pulse = lazy(() => import("./pages/Pulse"));
-const Architect = lazy(() => import("./pages/Architect"));
-const Optimizer = lazy(() => import("./pages/Optimizer"));
 
 function App() {
   const [appError, setAppError] = useState(null);
@@ -71,26 +67,7 @@ function App() {
             <Scale className="w-3.5 h-3.5" />
             השוואה
           </Link>
-          <Link to="/vendor/insights" className="flex items-center gap-1.5 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 hover:bg-cyan-500/20 transition-all font-black text-[10px] uppercase tracking-widest">
-            <Zap className="w-3 h-3" />
-            Insights
-          </Link>
-          <Link to="/playground" className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 hover:bg-emerald-500/20 transition-all font-black text-[10px] uppercase tracking-widest">
-            <PlusSquare className="w-3 h-3" />
-            Playground
-          </Link>
-          <Link to="/pulse" className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 border border-rose-500/20 rounded-full text-rose-400 hover:bg-rose-500/20 transition-all font-black text-[10px] uppercase tracking-widest">
-            <Activity className="w-3 h-3" />
-            Pulse
-          </Link>
-          <Link to="/architect" className="flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 hover:bg-indigo-500/20 transition-all font-black text-[10px] uppercase tracking-widest">
-            <GitBranch className="w-3 h-3" />
-            Architect
-          </Link>
-          <Link to="/optimizer" className="flex items-center gap-1.5 px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-400 hover:bg-yellow-500/20 transition-all font-black text-[10px] uppercase tracking-widest">
-            <Coins className="w-3 h-3" />
-            Optimizer
-          </Link>
+
           {isAdmin && (
             <>
               <Link to="/admin/vault" className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)] transition-all font-bold">
@@ -171,10 +148,6 @@ function App() {
             <Route path="/insiders/battle" element={<EloBattle setAppError={setAppError} />} />
             <Route path="/compare" element={<Compare setAppError={setAppError} />} />
             <Route path="/vendor/insights" element={<VendorInsights />} />
-            <Route path="/playground" element={<Playground setAppError={setAppError} />} />
-            <Route path="/pulse" element={<Pulse setAppError={setAppError} />} />
-            <Route path="/architect" element={<Architect setAppError={setAppError} />} />
-            <Route path="/optimizer" element={<Optimizer setAppError={setAppError} />} />
 
             {/* Catch All 404 */}
             <Route path="*" element={<NotFound />} />
