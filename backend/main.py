@@ -18,20 +18,26 @@ import uuid
 import json
 import os
 from pathlib import Path
-from pipeline import AetherPipeline
-from models import GalleryItem, LabAnalysis, TrustScore, ToolMetrics, VisualQuality, AuditLog, ManualToolEntry
-from auth import verify_admin_user, initialize_firebase_admin
+from .pipeline import AetherPipeline
+from .models import GalleryItem, LabAnalysis, TrustScore, ToolMetrics, VisualQuality, AuditLog, ManualToolEntry
+from .auth import verify_admin_user, initialize_firebase_admin
 initialize_firebase_admin()
 from fastapi import Request, Depends
 from firebase_admin import auth as firebase_auth
-from community_logic import calculate_elo_change, check_for_badges
-from models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
+from .community_logic import calculate_elo_change, check_for_badges
+from .models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
 
 app = FastAPI(title="Aeather API", description="Backend for the Agentic Grid", version="0.2.0")
 
 origins = [
     "https://www.aethercompass.com",
-    "http://localhost:5173"
+    "https://aethercompass.com",
+    "https://api.aethercompass.com",
+    "http://www.aethercompass.com",
+    "http://aethercompass.com",
+    "http://localhost:5173",
+    "http://localhost",
+    "http://localhost:80",
 ]
 
 # 3. הזרקת ה-Middleware
@@ -62,11 +68,11 @@ def get_current_user(authorization: str = Header(None)) -> Dict:
 pipeline = AetherPipeline()
 
 # Initialize Vault (Persistence Layer)
-from persistence import AetherVault
+from .persistence import AetherVault
 vault = AetherVault()
 
 # Initialize Semantic Search Engine
-from search_engine import AetherSearchEngine
+from .search_engine import AetherSearchEngine
 search_engine = AetherSearchEngine()
 
 @app.on_event("startup")
@@ -636,3 +642,6 @@ async def trigger_live_benchmark(background_tasks: BackgroundTasks, admin_email:
     monitor = LiveMonitor(vault)
     background_tasks.add_task(monitor.run_benchmark_cycle)
     return {"status": "success", "message": "Live benchmark cycle triggered in background."}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

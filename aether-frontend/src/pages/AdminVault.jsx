@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, ArrowRight, Check, Image as ImageIcon, Activity, Box, Search, ExternalLink, SlidersHorizontal, Layers, Percent, Server } from 'lucide-react';
+import { apiFetch } from '../api';
 
 // Live Preview Component (Mock of Sponsored/Feed Card)
 const LivePreview = ({ formData }) => {
@@ -163,7 +164,7 @@ export default function AdminVault() {
         try {
             const token = await currentUser.getIdToken();
             
-            const response = await fetch('http://127.0.0.1:8000/admin/vault/tool', {
+            const response = await apiFetch('/admin/vault/tool', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -205,7 +206,7 @@ export default function AdminVault() {
         try {
             setIsSubmitting(true);
             const token = await currentUser.getIdToken();
-            const response = await fetch('http://127.0.0.1:8000/admin/benchmarks/trigger', {
+            const response = await apiFetch('/admin/benchmarks/trigger', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from typing import List, Dict
-from models import TrustScore, AuditLog, ToolMetrics
+from ..models import TrustScore, AuditLog, ToolMetrics
 
 AUDITOR_SYSTEM_PROMPT = """
 Role: You are the Chief Auditor of Aether. Your sole purpose is to doubt, verify, and validate every piece of data entering the "Single Source of Truth."
@@ -131,7 +131,7 @@ class AuditorAgent:
         trust_model = TrustScore(
             authenticity_score=authenticity_score,
             evidence_quality_score=evidence_quality,
-            performance_stability=stability_score,
+            performance_stability=base_objective_score,
             marketing_noise_penalty=penalty,
             total_trust_score=total_trust
         )

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vercel/
+*.log
+lint*.json
+lint*.txt
+eslint_*.txt
+eslint_*.json
+eslint_report.json
+.git/

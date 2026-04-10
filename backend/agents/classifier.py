@@ -3,8 +3,8 @@ import os
 import json
 from datetime import datetime
 from typing import List, Dict
-from models import ScoutFindings, LabAnalysis, ToolMetrics, VisualQuality, IntentMapping
-import google.generativeai as genai
+from ..models import ScoutFindings, LabAnalysis, ToolMetrics, VisualQuality, IntentMapping
+import google.genai as genai
 from dotenv import load_dotenv
 
 load_dotenv()

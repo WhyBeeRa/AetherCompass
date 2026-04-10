@@ -6,6 +6,6 @@ python-dotenv
 praw
 PyGithub
 openai
-google-generativeai
+google-genai
 numpy
 firebase-admin

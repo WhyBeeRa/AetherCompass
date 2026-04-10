@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+vault.db
+venv/
+.venv/
+*.log
+error.txt
+trace.txt
+uvicorn_error.log
+startup.log
+firebase_error.log
+.git/

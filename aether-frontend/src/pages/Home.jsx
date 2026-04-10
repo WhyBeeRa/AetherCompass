@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Activity, Box, GitBranch, Coins, Zap, ArrowRight } from 'lucide-react';
+import { apiFetch } from '../api';
 
 export default function Home({ setAppError }) {
     const [query, setQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [hasResults, setHasResults] = useState(false);
     const [results, setResults] = useState([]);
-
-    const API_BASE = "http://localhost:8000";
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -23,7 +22,7 @@ export default function Home({ setAppError }) {
 
         try {
             // Target the Semantic Search Engine
-            const resp = await fetch(`${API_BASE}/search/intent?q=${encodeURIComponent(query)}`, {
+            const resp = await apiFetch(`/search/intent?q=${encodeURIComponent(query)}`, {
                 signal: controller.signal
             });
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, AlertTriangle, ExternalLink, CheckCircle2, XCircle, Terminal, FileText, Activity } from 'lucide-react';
+import { apiFetch } from '../api';
 
 export default function ToolDetails({ setAppError }) {
     const { id } = useParams();
@@ -34,8 +35,6 @@ export default function ToolDetails({ setAppError }) {
         localStorage.setItem('aether_saved_stack', JSON.stringify(savedStack));
     };
 
-    const API_BASE = "http://localhost:8000";
-
     useEffect(() => {
         const fetchToolData = async () => {
             setIsLoading(true);
@@ -44,7 +43,7 @@ export default function ToolDetails({ setAppError }) {
             try {
                 // Fetch the specific tool by Name/ID. 
                 // In Aether, the ID is typically the tool_name currently.
-                const response = await fetch(`${API_BASE}/tool/${encodeURIComponent(id)}`);
+                const response = await apiFetch(`/tool/${encodeURIComponent(id)}`);
 
                 if (!response.ok) {
                     if (response.status === 404) {

@@ -1,9 +1,2 @@
-!!! LOADING ENV FROM: D:\AntiGravity\AeatherTheAIcompass\backend\.env
+!!! LOADING ENV FROM: /app/.env
 .env file exists
->>> CALLING initialize_firebase_admin()
->>> Found FIREBASE_SERVICE_ACCOUNT (length: 2378)
->>> Firebase Admin: Initialized successfully
->>> CALLING initialize_firebase_admin()
->>> Firebase Admin already initialized. Skipping.
->>> CALLING initialize_firebase_admin()
->>> Firebase Admin already initialized. Skipping.

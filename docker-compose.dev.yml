@@ -1,0 +1,56 @@
+# ============================================================
+# AetherCompass — Remote Development Environment
+# Usage:  docker compose -f docker-compose.dev.yml up -d --build
+# Access: http://localhost:8443  (or via Cloudflare Tunnel)
+# ============================================================
+
+services:
+  # ── VS Code in the Browser ─────────────────────────────────
+  devbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: aether-devbox
+    ports:
+      - "8443:8443"
+    environment:
+      # 🔒 Change this password! Used to login to the web IDE.
+      - PASSWORD=yuval123!
+    volumes:
+      # Mount the entire project into /workspace
+      - .:/workspace
+      # Persist code-server extensions & config between restarts
+      - devbox-data:/home/coder/.local/share/code-server
+    restart: unless-stopped
+    # Recommended: at least 2GB RAM for code-server
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # ── Backend with Hot-Reload ────────────────────────────────
+  backend-dev:
+    build: ./backend
+    container_name: aether-backend-dev
+    ports:
+      # Port 8001 to avoid conflict with production backend (8000)
+      - "8001:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Mount backend source for live editing
+      - ./backend:/app
+      # Persist SQLite database
+      - ./backend/vault.db:/app/vault.db
+    # Hot-reload: uvicorn watches for file changes
+    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  devbox-data:
+    name: aether-devbox-data

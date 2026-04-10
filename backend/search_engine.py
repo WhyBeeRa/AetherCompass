@@ -2,11 +2,11 @@ import os
 import json
 import asyncio
 import numpy as np
-import google.generativeai as genai
+import google.genai as genai
 from typing import List, Dict
 from pydantic import BaseModel
 
-from persistence import AetherVault
+from .persistence import AetherVault
 
 SEARCH_SYSTEM_PROMPT = """You are the Aether Semantic Search Engine.
 Your job is to deeply understand a user's natural language query (intent) and match it against a provided list of AI tools.

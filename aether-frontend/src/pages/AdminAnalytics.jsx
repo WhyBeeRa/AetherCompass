@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart3, Search, Clock, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { apiFetch } from '../api';
 
 const AdminAnalytics = ({ setAppError }) => {
     const { currentUser, isAdmin } = useAuth();
@@ -14,7 +15,7 @@ const AdminAnalytics = ({ setAppError }) => {
             try {
                 setIsLoading(true);
                 const token = await currentUser.getIdToken();
-                const res = await fetch('http://127.0.0.1:8000/admin/analytics', {
+                const res = await apiFetch('/admin/analytics', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error("Failed to fetch analytics");

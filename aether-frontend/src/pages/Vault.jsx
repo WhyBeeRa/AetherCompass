@@ -3,6 +3,7 @@ import { Shield, Clock, TrendingUp, CheckCircle, Search, Layers, Server, AlertCi
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import LiveMonitorWidget from '../components/LiveMonitorWidget';
+import { apiFetch } from '../api';
 
 const Vault = ({ setAppError }) => {
     const navigate = useNavigate();
@@ -28,7 +29,7 @@ const Vault = ({ setAppError }) => {
             try {
                 setIsLoading(true);
                 // Fetch stats
-                const statsRes = await fetch('http://127.0.0.1:8000/vault/stats');
+                const statsRes = await apiFetch('/vault/stats');
                 if (!statsRes.ok) throw new Error("Failed to fetch vault stats");
                 const statsData = await statsRes.json();
                 setStats(statsData);
@@ -36,7 +37,7 @@ const Vault = ({ setAppError }) => {
                 // Fetch all tools (admins should see inactive ones too eventually, but search_tools filters by default)
                 // For now, let's keep it simple. Admins see everything if we pass a flag? 
                 // Let's stick to public for now, or update API if needed.
-                const toolsRes = await fetch('http://127.0.0.1:8000/vault/search?q=');
+                const toolsRes = await apiFetch('/vault/search?q=');
                 if (!toolsRes.ok) throw new Error("Failed to fetch vault data");
                 const toolsData = await toolsRes.json();
                 setTools(toolsData);
@@ -55,7 +56,7 @@ const Vault = ({ setAppError }) => {
         try {
             setIsUpdating(true);
             const token = await currentUser.getIdToken();
-            const res = await fetch(`http://127.0.0.1:8000/admin/vault/toggle/${encodeURIComponent(toolName.toLowerCase())}?active=${!currentStatus}`, {
+            const res = await apiFetch(`/admin/vault/toggle/${encodeURIComponent(toolName.toLowerCase())}?active=${!currentStatus}`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -73,7 +74,7 @@ const Vault = ({ setAppError }) => {
         try {
             setIsUpdating(true);
             const token = await currentUser.getIdToken();
-            const res = await fetch(`http://127.0.0.1:8000/admin/vault/pricing/${encodeURIComponent(toolName.toLowerCase())}?pricing=${encodeURIComponent(newPricingValue)}`, {
+            const res = await apiFetch(`/admin/vault/pricing/${encodeURIComponent(toolName.toLowerCase())}?pricing=${encodeURIComponent(newPricingValue)}`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -99,7 +100,7 @@ const Vault = ({ setAppError }) => {
         try {
             setIsDeleting(true);
             const token = await currentUser.getIdToken();
-            const res = await fetch(`http://127.0.0.1:8000/admin/vault/tool/${encodeURIComponent(toolName.toLowerCase())}`, {
+            const res = await apiFetch(`/admin/vault/tool/${encodeURIComponent(toolName.toLowerCase())}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`

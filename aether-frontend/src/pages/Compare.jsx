@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Plus, Zap, DollarSign, Share2, ShieldCheck, Scale, Image as ImageIcon, Code, AlignLeft, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiFetch } from '../api';
 
 const Compare = ({ setAppError }) => {
     const [selectedTools, setSelectedTools] = useState([]);
@@ -18,7 +19,7 @@ const Compare = ({ setAppError }) => {
             }
             try {
                 setIsSearching(true);
-                const res = await fetch(`http://127.0.0.1:8000/vault/search?q=${encodeURIComponent(searchQuery)}`);
+                const res = await apiFetch(`/vault/search?q=${encodeURIComponent(searchQuery)}`);
                 if (!res.ok) throw new Error("Search failed");
                 const data = await res.json();
                 setSearchResults(data);

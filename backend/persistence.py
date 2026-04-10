@@ -2,7 +2,7 @@ import sqlite3
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any
-from models import AuditLog, LabAnalysis, GalleryItem, TrustScore, UserProfile, Badge, LiveMetric
+from .models import AuditLog, LabAnalysis, GalleryItem, TrustScore, UserProfile, Badge, LiveMetric
 
 from pathlib import Path
 
@@ -344,6 +344,7 @@ class AetherVault:
                      
          conn.close()
          return {
+             "verified_tools_count": count,
              "total_intents_mapped": len(unique_intents),
              "last_scan_date": last_scan
          }

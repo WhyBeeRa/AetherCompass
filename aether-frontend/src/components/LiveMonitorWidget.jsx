@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Zap, ShieldAlert, Clock, Sparkles } from 'lucide-react';
+import { apiFetch } from '../api';
 
 const LiveMonitorWidget = () => {
     const [benchmarks, setBenchmarks] = useState([]);
@@ -8,7 +9,7 @@ const LiveMonitorWidget = () => {
     useEffect(() => {
         const fetchBenchmarks = async () => {
             try {
-                const res = await fetch('http://127.0.0.1:8000/benchmarks/live');
+                const res = await apiFetch('/benchmarks/live');
                 if (res.ok) {
                     const data = await res.json();
                     setBenchmarks(data);

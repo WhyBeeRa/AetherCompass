@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Bookmark, LayoutGrid, List, Search, ArrowUpRight, FolderHeart, Trash2 } from 'lucide-react';
+import { apiFetch } from '../api';
 
 export default function MyStack() {
     const [viewMode, setViewMode] = useState('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [savedTools, setSavedTools] = useState([]);
     const [, setIsLoading] = useState(false);
-
-    const API_BASE = "http://localhost:8000";
 
     useEffect(() => {
         const fetchStack = async () => {
@@ -21,7 +20,7 @@ export default function MyStack() {
 
                 // Fetch full details for each saved tool
                 const fetchPromises = stackNames.map(name =>
-                    fetch(`${API_BASE}/tool/${encodeURIComponent(name)}`).then(res => {
+                    apiFetch(`/tool/${encodeURIComponent(name)}`).then(res => {
                         if (!res.ok) throw new Error("Not found");
                         return res.json();
                     }).catch(() => null) // Ignore deleted/missing tools gracefully

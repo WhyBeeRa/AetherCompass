@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layers, Search, Video, FileText, Image as ImageIcon, Code, Mic, Building2, TrendingUp, Presentation, ArrowUpLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../api';
 
 export default function UseCases() {
     const navigate = useNavigate();
@@ -10,7 +11,7 @@ export default function UseCases() {
     useEffect(() => {
         const fetchCounts = async () => {
             try {
-                const res = await fetch("http://127.0.0.1:8000/vault/categories/stats");
+                const res = await apiFetch('/vault/categories/stats');
                 if (res.ok) {
                     const data = await res.json();
                     setCounts(data);
