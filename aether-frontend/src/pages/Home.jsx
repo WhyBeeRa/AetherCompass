@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ShieldCheck, Activity, Box, GitBranch, Coins, Zap, ArrowRight } from 'lucide-react';
 import { apiFetch } from '../api';
 
@@ -204,9 +205,9 @@ export default function Home({ setAppError }) {
                                             })()}
                                         </button>
 
-                                        <a href={`/tool/${encodeURIComponent(toolId)}`} className="px-6 py-2.5 text-sm font-bold text-white border border-white/20 rounded-xl hover:bg-white/5 backdrop-blur-md hover:border-white/20 transition-all shadow-sm">
+                                        <Link to={`/tool/${encodeURIComponent(toolId)}`} className="px-6 py-2.5 text-sm font-bold text-white border border-white/20 rounded-xl hover:bg-white/5 backdrop-blur-md hover:border-white/20 transition-all shadow-sm">
                                             קרא ניתוח ותרחישים מלאים
-                                        </a>
+                                        </Link>
                                     </div>
 
                                 </div>

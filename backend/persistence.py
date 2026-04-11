@@ -249,9 +249,9 @@ class AetherVault:
         if not row:
             return None
             
-        # Expiration Logic (7 Days)
+        # Expiration Logic (90 Days - Extended for better UX / development)
         last_updated = datetime.fromisoformat(str(row['last_updated']))
-        if datetime.now() - last_updated > timedelta(days=7):
+        if datetime.now() - last_updated > timedelta(days=90):
             if include_expired:
                 print(f"[Vault] Tool '{row['tool_name']}' is EXPIRED but returning anyway due to override.")
             else:
