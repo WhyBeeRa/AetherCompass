@@ -31,16 +31,15 @@ def initialize_firebase_admin():
         if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
             json_str = json_str[1:-1]
         
-        # If it doesn't start with {, it's likely Base64 encoded (safer for Render)
+        # If it's Base64, decode it first
         if not json_str.startswith("{"):
             try:
                 json_str = base64.b64decode(json_str).decode('utf-8')
             except Exception as b64e:
-                # Fallback: maybe it's just a broken JSON string
-                print(f"Base64 Decode skipped: {b64e}")
+                print(f"Base64 Decode skipped or failed: {b64e}")
         
-        # Unescape escaped newlines if they are literal backslash+n
-        json_str = json_str.replace("\\\\n", "\\n").replace("\\n", "\n")
+        # CRITICAL FIX: Do NOT manually replace \n with real newlines in the JSON SOURCE.
+        # json.loads() handles \n escapes internally. Real newlines in JSON strings are illegal.
         
         cred_dict = json.loads(json_str)
         cred = credentials.Certificate(cred_dict)
