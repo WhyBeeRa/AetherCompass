@@ -26,7 +26,8 @@ async def run_lean_audit(url: str):
     # 1. Scrape Title and Meta Description
     meta_data = {"title": "", "description": ""}
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+        async with httpx.AsyncClient(headers=headers, timeout=10.0, follow_redirects=True) as client:
             response = await client.get(url)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'html.parser')
