@@ -1,5 +1,6 @@
 import json
 import os
+import base64
 import firebase_admin
 from firebase_admin import credentials, auth
 from fastapi import Header, HTTPException
@@ -30,8 +31,15 @@ def initialize_firebase_admin():
         if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
             json_str = json_str[1:-1]
         
+        # If it doesn't start with {, it's likely Base64 encoded (safer for Render)
+        if not json_str.startswith("{"):
+            try:
+                json_str = base64.b64decode(json_str).decode('utf-8')
+            except Exception as b64e:
+                # Fallback: maybe it's just a broken JSON string
+                print(f"Base64 Decode skipped: {b64e}")
+        
         # Unescape escaped newlines if they are literal backslash+n
-        # Some environments escape backslashes
         json_str = json_str.replace("\\\\n", "\\n").replace("\\n", "\n")
         
         cred_dict = json.loads(json_str)
@@ -76,5 +84,5 @@ def verify_admin_user(authorization: str = Header(None)) -> str:
         print(f"[Auth Error] {e}")
         error_msg = str(e)
         if "expired" in error_msg.lower():
-            raise HTTPException(status_code=401, detail="Token Expired. Please re-login.")
+            raise HTTPException(status_code=401, detail="Token Expired. Please re-login")
         raise HTTPException(status_code=401, detail=f"Invalid Token: {error_msg}")
