@@ -477,10 +477,13 @@ def approve_tool(tool_name: str):
 def debug_firebase():
     from auth import is_firebase_ready, firebase_init_error
     import firebase_admin
+    import os
+    raw_env = os.getenv("FIREBASE_SERVICE_ACCOUNT", "")
     return {
-        "version": 2,
+        "version": 3,
         "is_ready": is_firebase_ready,
         "init_error": firebase_init_error,
+        "first_5_chars": raw_env[:5] + "...",
         "apps_count": len(firebase_admin._apps),
         "project_id": os.getenv("VITE_FIREBASE_PROJECT_ID", "Not Set")
     }
