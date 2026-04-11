@@ -1,5 +1,5 @@
 from typing import List, Dict
-from ..models import ScoutFindings, AuditLog, GalleryItem, VisualQuality
+from models import ScoutFindings, AuditLog, GalleryItem, VisualQuality
 
 CURATOR_SYSTEM_PROMPT = """
 Role: You are the Chief Visual Architect and Curator of Aether. Your job is to transform raw evidence and verified data into an objective, inspiring, and searchable visual gallery.

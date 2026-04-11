@@ -2,7 +2,7 @@ import sqlite3
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any
-from .models import AuditLog, LabAnalysis, GalleryItem, TrustScore, UserProfile, Badge, LiveMetric
+from models import AuditLog, LabAnalysis, GalleryItem, TrustScore, UserProfile, Badge, LiveMetric
 
 from pathlib import Path
 

@@ -1,6 +1,6 @@
 import math
 from typing import List, Tuple
-from .models import Badge, UserProfile
+from models import Badge, UserProfile
 
 def calculate_elo_change(winner_elo: float, loser_elo: float, k_factor: int = 32) -> Tuple[float, float]:
     """

@@ -99,7 +99,7 @@ def verify_admin_user(authorization: str = Header(None)) -> str:
     
     token = authorization.split(" ")[1]
     
-    # Parse admin emails from .env
+    # Parse admin emails from env
     admin_emails_str = os.getenv("ADMIN_EMAILS", "")
     admin_emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
 

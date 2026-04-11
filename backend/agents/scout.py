@@ -3,7 +3,7 @@ import os
 import json
 from typing import List, Dict
 from datetime import datetime
-from ..models import ScoutFindings, VisualProof
+from models import ScoutFindings, VisualProof
 import google.genai as genai
 from dotenv import load_dotenv
 
