@@ -7,13 +7,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Global state for debugging
+is_firebase_ready = False
+firebase_init_error = None
+
 def initialize_firebase_admin():
+    global is_firebase_ready, firebase_init_error
+    
     if firebase_admin._apps:
+        is_firebase_ready = True
         return True
 
     service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT")
     if not service_account_json:
-        print("FIREBASE_SERVICE_ACCOUNT NOT FOUND")
+        firebase_init_error = "FIREBASE_SERVICE_ACCOUNT NOT FOUND IN ENV"
+        print(firebase_init_error)
         return False
 
     try:
@@ -23,19 +31,22 @@ def initialize_firebase_admin():
             json_str = json_str[1:-1]
         
         # Unescape escaped newlines if they are literal backslash+n
+        # Some environments escape backslashes
         json_str = json_str.replace("\\\\n", "\\n").replace("\\n", "\n")
         
         cred_dict = json.loads(json_str)
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
         print("Firebase Admin initialized successfully")
+        is_firebase_ready = True
         return True
     except Exception as e:
+        firebase_init_error = str(e)
         print(f"Firebase Init Error: {e}")
         return False
 
 # Attempt initialization
-is_firebase_ready = initialize_firebase_admin()
+initialize_firebase_admin()
 
 def verify_admin_user(authorization: str = Header(None)) -> str:
     """
