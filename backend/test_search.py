@@ -1,12 +1,19 @@
 import asyncio
 import time
+import os
+from dotenv import load_dotenv
+
+# Load environment variables before importing the engine
+load_dotenv()
+
 from search_engine import AetherSearchEngine
 
 async def run_test():
     print("Initializing Aether Search Engine...")
     engine = AetherSearchEngine()
     
-    query = "כלי ליצירת מצגות"
+    # Force query to be treated as UTF-8
+    query = "כלי ליצירת מצגות" 
     print(f"\n[Test] Running Query: '{query}'")
     
     start = time.time()
@@ -19,8 +26,11 @@ async def run_test():
         return
         
     for idx, r in enumerate(results):
-        print(f"{idx+1}. {r.get('tool_name')} - Score: {r.get('relevance_score')}")
-        print(f"   Reason: {r.get('match_reason')}")
+        name = r.get('tool_name', 'Unknown')
+        score = r.get('relevance_score', 0)
+        reason = r.get('match_reason', 'No reason provided')
+        print(f"{idx+1}. {name} - Score: {score}")
+        print(f"   Reason: {reason}")
 
 if __name__ == "__main__":
     asyncio.run(run_test())

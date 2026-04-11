@@ -2,180 +2,161 @@ import os
 import json
 import asyncio
 import numpy as np
-import google.generativeai as genai
-from typing import List, Dict
-from pydantic import BaseModel
+from typing import List, Dict, Optional
+from pydantic import BaseModel, Field
+from google import genai
+from google.genai import types
 
 from persistence import AetherVault
 
-SEARCH_SYSTEM_PROMPT = """You are the Aether Semantic Search Engine.
+SEARCH_SYSTEM_PROMPT = """You are the Aether Semantic Search Engine, an AI expert in matching user needs to AI tools.
 Your job is to deeply understand a user's natural language query (intent) and match it against a provided list of AI tools.
-You must not just do keyword matching; you must look at the 'job to be done' and the 'intents_mapped' for each tool.
-Rank the tools by how well they solve the user's specific problem.
-Take into account the 'trust_score' of the tools if multiple tools match.
 
-You must return a STRICT JSON array of objects.
-Each object should have:
-- "tool_name": The exact name of the matched tool.
-- "match_reason": A short 1-sentence explanation of why this is a good match for the query.
-- "relevance_score": A score from 0 to 100 indicating how perfect the match is.
+You will be given:
+1. A user query (the intent).
+2. A list of candidate tools with their name, summary, and specific 'jobs to be done'.
 
-Only return tools that are reasonably relevant. Do not include tools that cannot solve the user's problem.
-Return a maximum of 5 tools. If no tools match, return an empty array [].
+Your mission:
+- Filter out tools that are NOT relevant to the query.
+- Rank the remaining tools by how well they solve the specific problem.
+- For each tool, provide a 'match_reason' in HEBREW (עברית) explaining exactly why it fits the user's need.
+- Assign a 'relevance_score' (0-100) reflecting the match quality.
+
+You must return a STRICT JSON object matching the provided schema.
+Rank results by relevance_score descending. Max 5 tools. If no tools match, return an empty array.
 """
 
 class RankedTool(BaseModel):
-    tool_name: str
-    match_reason: str
-    relevance_score: int
+    tool_name: str = Field(description="The exact name of the tool provided in the candidates.")
+    match_reason: str = Field(description="A short 1-sentence explanation in HEBREW (עברית) of why this tool matches.")
+    relevance_score: int = Field(ge=0, le=100, description="Score defining how well the tool matches the intent.")
 
 class SearchEngineResponse(BaseModel):
     results: List[RankedTool]
 
 class AetherSearchEngine:
     def __init__(self):
-        from dotenv import load_dotenv
-        load_dotenv()
-        # Configure genai explicitly to use GEMINI_API_KEY if present
+        # Build client using the new SDK
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if api_key:
-            genai.configure(api_key=api_key)
-
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=SEARCH_SYSTEM_PROMPT,
-            generation_config=genai.GenerationConfig(
-                temperature=0.1, # Keep it deterministic
-                response_mime_type="application/json",
-                response_schema=SearchEngineResponse
-            )
-        )
+        self.client = genai.Client(api_key=api_key) if api_key else None
+        self.model_id = "gemini-2.5-flash"
         self.vault = AetherVault()
 
     async def _get_embedding(self, text: str) -> List[float]:
         """Fetch the embedding for a given text from Gemini."""
+        if not self.client:
+            return []
         try:
-            # We use gemini-embedding-001 as the stable multilingual model
-            result = await asyncio.to_thread(
-                genai.embed_content,
+            # We must use the same model as the one used for indexing (gemini-embedding-001)
+            result = self.client.models.embed_content(
                 model="models/gemini-embedding-001",
-                content=text,
-                task_type="retrieval_query"
+                contents=text,
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
             )
-            return result['embedding']
+            return result.embeddings[0].values
         except Exception as e:
             print(f"[SearchEngine] Error generating embedding: {e}")
             return []
 
     async def semantic_search(self, query: str) -> List[Dict]:
         """
-        Hybrid Search:
-        1. Fast Keyword Search (SQLite LIKE)
-        2. Vector Semantic Search (Cosine Similarity)
-        3. Reciprocal Rank Fusion / Score Combining
+        AI-Powered Hybrid Search:
+        1. Fast Keyword/Vector candidate retrieval.
+        2. LLM-based Reranking and Reasoning.
         """
-        tools = [dict(t) if not isinstance(t, dict) else t for t in self.vault.search_tools("")] # Get all tools for vector search
-        if not tools:
+        # Fetch all tools from vault (29-31 tools is small enough to handle)
+        all_tools = self.vault.search_tools("", include_inactive=False)
+        if not all_tools:
             return []
 
-        # FAST PATH: Literal matches (e.g. searching exact names)
-        keyword_results = [dict(t) if not isinstance(t, dict) else t for t in self.vault.search_tools(query)]
-        keyword_tool_names = {t["tool_name"].lower() for t in keyword_results}
-        
-        # If the query is very short, just rely on keyword
-        if len(keyword_results) > 0 and len(query.split()) <= 2:
-            for t in keyword_results:
-                 t["match_reason"] = f"התאמה ישירה למילת החיפוש '{query}'"
-                 t["relevance_score"] = 90
-            keyword_results.sort(key=lambda x: x.get("trust_score", 0), reverse=True)
-            return keyword_results[:5]
-
-        # VECTOR SEARCH PATH
+        # 1. RETRIEVE CANDIDATES (Vector Search)
         query_embedding = await self._get_embedding(query)
-        
-        vector_scores = {}
+        candidates = []
+
         if query_embedding:
-            # Convert query to numpy array
             q_vec = np.array(query_embedding)
             q_norm = np.linalg.norm(q_vec)
             
-            if q_norm > 0:
-                for t in tools:
-                    emb = t.get("embedding") # get_tool / search_tools already parsed this from JSON
-                    if emb:
-                        t_vec = np.array(emb)
+            for t in all_tools:
+                emb = t.get("embedding")
+                if emb:
+                    # Handle potential size mismatch if model changed
+                    t_vec = np.array(emb)
+                    if t_vec.shape == q_vec.shape:
                         t_norm = np.linalg.norm(t_vec)
-                        if t_norm > 0:
-                            # Cosine Similarity: dot(A, B) / (norm(A) * norm(B))
+                        if q_norm > 0 and t_norm > 0:
                             sim = np.dot(q_vec, t_vec) / (q_norm * t_norm)
-                            # Convert similarity to a 0-100 score
-                            score = int((sim + 1) * 50) # map [-1, 1] to [0, 100]
-                            # Boost slightly if it's high similarity
-                            score = min(100, int(score * (1 + (sim * 0.2)))) if sim > 0.5 else score
-                            vector_scores[t["tool_name"].lower()] = score
-                            
-        # HYBRID FUSION
-        final_scores = []
-        for t in tools:
-            tool_name_lower = t["tool_name"].lower()
-            
-            # Base Vector Score (if embedding existed and calculation worked)
-            v_score = vector_scores.get(tool_name_lower, 0)
-            
-            # Base Keyword Score
-            k_score = 0
-            if tool_name_lower in keyword_tool_names:
-                k_score = 60 # Standard keyword match
-                # Exact name match gets highest keyword score
-                if query.lower() in tool_name_lower or tool_name_lower in query.lower():
-                    k_score = 90
-            
-            # Combine - we take the max of either, plus a small bump if BOTH hit
-            final_score = max(v_score, k_score)
-            if v_score > 60 and k_score > 0:
-                 final_score = min(100, final_score + 10)
-                 
-            # Add Trust Score signal (very small influence: 0-5 points max)
-            trust_bump = (t.get("trust_score", 0) / 100.0) * 5
-            final_score = min(100, int(final_score + trust_bump))
-                 
-            if final_score > 65: # Threshold for relevance
-                final_scores.append((final_score, t))
-                
-        # Sort by final hybrid score
-        final_scores.sort(key=lambda x: x[0], reverse=True)
-        top_results = final_scores[:5]
+                            candidates.append((sim, t))
         
-        # Format the return objects
-        formatted_results = []
-        for score, t in top_results:
-             # If we relied solely on keyword, update the reason
-             if score == k_score and v_score < 60:
-                 reason = f"התאמה נמצאה על בסיס מילות מפתח ('{query}')"
-             else:
-                 # It's a semantic vector match
-                 reason = "התאמה נמצאה על בסיס חיפוש סמנטי (וקטורי) לכוונתך"
-                 
-                 # Try to find a better specific reason from the tool's intents
-                 analysis = t.get("analysis", {})
-                 intents = analysis.get("intents_mapped", [])
-                 for intent in intents:
-                      desc = intent.get("intent_description", "")
-                      # If the vector algorithm matched highly, the primary intent is usually why
-                      if desc:
-                           reason = f"התאמה מדויקת לכוונת: {desc}"
-                           break
-                           
-             t["match_reason"] = reason
-             t["relevance_score"] = score
-             formatted_results.append(t)
-             
-        # FALLBACK: If hybrid search found literally nothing, return at least keyword search again if available
-        if not formatted_results and keyword_results:
-             for t in keyword_results:
-                 t["match_reason"] = "התאמה מהירה (לא נמצאה התאמה סמנטית מדויקת)"
-                 t["relevance_score"] = 50
-             keyword_results.sort(key=lambda x: x.get("trust_score", 0), reverse=True)
-             return keyword_results[:5]
+        # Sort by similarity and pick top 15
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        top_candidates = [c[1] for c in candidates[:15]]
+        
+        # If no vector match, try keyword search as fallback for candidates
+        if not top_candidates:
+             top_candidates = self.vault.search_tools(query)[:10]
 
-        return formatted_results
+        if not top_candidates:
+            return []
+
+        # 2. RERANK & EXPLAIN (The Gemini Step)
+        if not self.client:
+            # Fallback if no API key
+            return top_candidates[:5]
+
+        # Prepare tools context for the LLM
+        tools_context = []
+        for t in top_candidates:
+            analysis = t.get("analysis", {})
+            tools_context.append({
+                "name": t["tool_name"],
+                "summary": analysis.get("executive_summary", ""),
+                "jobs": analysis.get("job_to_be_done", [])
+            })
+
+        rerank_prompt = f"""
+        USER INTENT: "{query}"
+        
+        CANDIDATE TOOLS:
+        {json.dumps(tools_context, ensure_ascii=False)}
+        
+        Pick the most relevant tools (max 5) and explain why in Hebrew.
+        """
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=rerank_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SEARCH_SYSTEM_PROMPT,
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                    response_schema=SearchEngineResponse
+                )
+            )
+            
+            ai_results = response.parsed.results
+            
+            # 3. FINAL MERGE
+            final_formatted = []
+            # Create a lookup for data from the original tool objects
+            tool_lookup = {t["tool_name"].lower(): t for t in top_candidates}
+            
+            for res in ai_results:
+                original_tool = tool_lookup.get(res.tool_name.lower())
+                if original_tool:
+                    # Update with AI insights
+                    original_tool["match_reason"] = res.match_reason
+                    original_tool["relevance_score"] = res.relevance_score
+                    final_formatted.append(original_tool)
+            
+            return final_formatted
+
+        except Exception as e:
+            print(f"[SearchEngine] Gemini Reranking failed: {e}")
+            # Fallback to simple top 5 if LLM fails
+            for t in top_candidates[:5]:
+                t["match_reason"] = "התאמה נמצאה על בסיס חיפוש סמנטי (ללא הסבר מעמיק)"
+                t["relevance_score"] = 70
+            return top_candidates[:5]
+

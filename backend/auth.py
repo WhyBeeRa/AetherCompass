@@ -51,15 +51,15 @@ def initialize_firebase_admin():
             # We'll use placeholder values for the missing fields
             cred_dict = {
                 "type": "service_account",
-                "project_id": "aether-ai-compass",
+                "project_id": "aethercompass-prod-42214",
                 "private_key_id": "placeholder-key-id",
                 "private_key": json_str.replace("\\n", "\n"),
-                "client_email": "firebase-adminsdk-placeholder@aether-ai-compass.iam.gserviceaccount.com",
+                "client_email": "firebase-adminsdk-placeholder@aethercompass-prod-42214.iam.gserviceaccount.com",
                 "client_id": "placeholder-client-id",
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-placeholder@aether-ai-compass.iam.gserviceaccount.com"
+                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-placeholder@aethercompass-prod-42214.iam.gserviceaccount.com"
             }
             json_str = json.dumps(cred_dict)
         else:
