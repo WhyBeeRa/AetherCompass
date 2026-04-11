@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Target, Trophy, Swords, Zap, Users, Star } from 'lucide-react';
+import { Shield, Target, Trophy, Swords, Zap, Users, Star, CheckCircle } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,7 @@ const AetherInsiders = ({ setAppError }) => {
   const [showScoutModal, setShowScoutModal] = useState(false);
   const [scoutData, setScoutData] = useState({ name: '', url: '', description: '' });
   const [scouting, setScouting] = useState(false);
+  const [scoutSuccess, setScoutSuccess] = useState(false);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -72,14 +73,24 @@ const AetherInsiders = ({ setAppError }) => {
       if (res.ok) {
         const data = await res.json();
         setProfile(data.user);
-        setShowScoutModal(false);
+        setScoutSuccess(true);
         setScoutData({ name: '', url: '', description: '' });
         // Refresh leaderboard to show new points
         const lbRes = await fetch(`${import.meta.env.VITE_API_URL}/community/leaderboard`);
         if (lbRes.ok) setLeaderboard(await lbRes.json());
+        
+        // Close modal after 3 seconds
+        setTimeout(() => {
+            setShowScoutModal(false);
+            setScoutSuccess(false);
+        }, 3000);
+      } else {
+        const errorData = await res.json();
+        if (setAppError) setAppError(errorData.detail || "נכשל בשליחת הכלי לבדיקה.");
       }
     } catch (err) {
       console.error(err);
+      if (setAppError) setAppError("שגיאת תקשורת עם השרת.");
     } finally {
       setScouting(false);
     }
@@ -257,47 +268,58 @@ const AetherInsiders = ({ setAppError }) => {
                  </div>
               </div>
 
-              <form onSubmit={handleScoutSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-white/40 uppercase tracking-widest mr-1">Tool Name</label>
-                  <input 
-                    required
-                    value={scoutData.name}
-                    onChange={(e) => setScoutData({...scoutData, name: e.target.value})}
-                    placeholder="e.g. Cursor AI"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-cyan-500/50 outline-none transition-all"
-                  />
+              {scoutSuccess ? (
+                <div className="py-12 text-center space-y-4 animate-in zoom-in duration-500">
+                  <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
+                    <CheckCircle className="w-10 h-10 text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white italic">SCOUTING SUCCESSFUL!</h3>
+                  <p className="text-white/60 text-sm">המשימה נקלטה. סוכן ה-AI עובד כרגע על סריקה מעמיקה של הכלי. הוא יופיע לאדמין לאישור ברגע שהדוח יושלם.</p>
+                  <p className="text-cyan-400 font-black text-xs uppercase tracking-widest">+50 XP AWARDED</p>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-white/40 uppercase tracking-widest mr-1">Website URL</label>
-                  <input 
-                    required
-                    type="url"
-                    value={scoutData.url}
-                    onChange={(e) => setScoutData({...scoutData, url: e.target.value})}
-                    placeholder="https://..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-cyan-500/50 outline-none transition-all"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-white/40 uppercase tracking-widest mr-1">Brief Description</label>
-                  <textarea 
-                    required
-                    value={scoutData.description}
-                    onChange={(e) => setScoutData({...scoutData, description: e.target.value})}
-                    placeholder="Why should this be in the vault?"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-cyan-500/50 outline-none transition-all h-24 resize-none"
-                  />
-                </div>
-                
-                <button 
-                  disabled={scouting}
-                  type="submit"
-                  className="w-full py-4 bg-cyan-500 text-[#040914] font-black italic rounded-2xl hover:bg-cyan-400 transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)] disabled:opacity-50"
-                >
-                  {scouting ? "SUBMITTING TO AUDITOR..." : "SUBMIT FOR VERIFICATION"}
-                </button>
-              </form>
+              ) : (
+                <form onSubmit={handleScoutSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-white/40 uppercase tracking-widest mr-1">Tool Name</label>
+                    <input 
+                      required
+                      value={scoutData.name}
+                      onChange={(e) => setScoutData({...scoutData, name: e.target.value})}
+                      placeholder="e.g. Cursor AI"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-cyan-500/50 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-white/40 uppercase tracking-widest mr-1">Website URL</label>
+                    <input 
+                      required
+                      type="url"
+                      value={scoutData.url}
+                      onChange={(e) => setScoutData({...scoutData, url: e.target.value})}
+                      placeholder="https://..."
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-cyan-500/50 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-white/40 uppercase tracking-widest mr-1">Brief Description</label>
+                    <textarea 
+                      required
+                      value={scoutData.description}
+                      onChange={(e) => setScoutData({...scoutData, description: e.target.value})}
+                      placeholder="Why should this be in the vault?"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-cyan-500/50 outline-none transition-all h-24 resize-none"
+                    />
+                  </div>
+                  
+                  <button 
+                    disabled={scouting}
+                    type="submit"
+                    className="w-full py-4 bg-cyan-500 text-[#040914] font-black italic rounded-2xl hover:bg-cyan-400 transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)] disabled:opacity-50"
+                  >
+                    {scouting ? "SUBMITTING TO AUDITOR..." : "SUBMIT FOR VERIFICATION"}
+                  </button>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

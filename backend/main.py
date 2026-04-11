@@ -673,15 +673,27 @@ def get_leaderboard():
     return vault.get_user_rankings(limit=20)
 
 async def background_audit_scouted_tool(url: str, description: str, submitter_email: str):
-    print(f"[Background] Starting AI Audit for scouted tool: {url}")
+    log_file = "background_tasks.log"
+    with open(log_file, "a") as f:
+        f.write(f"\n[{datetime.now()}] STARTING AUDIT: {url} (requested by {submitter_email})\n")
+
     try:
+        # Step 1: Run Scraper + Gemini Audit
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now()}] Step 1: Running Agent Scan...\n")
+
         response = await run_lean_audit(url)
         if response.get("status") == "error":
-            print(f"[Background Auditor Error] {response.get('reason')}")
+            with open(log_file, "a") as f:
+                f.write(f"[{datetime.now()}] FAIL: Auditor returned error: {response.get('reason')}\n")
             return
             
         data = response["audit_data"]
         
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now()}] Step 2: Agent Scan Complete. Name: {data.get('name')}. Trust Score: {data.get('trust_score')}\n")
+
+        # Step 2: Construct LabAnalysis
         analysis = LabAnalysis(
             tool_name=data["name"],
             metrics=ToolMetrics(
@@ -709,6 +721,10 @@ async def background_audit_scouted_tool(url: str, description: str, submitter_em
             new_trust_score=float(data.get("trust_score", 50))
         )
 
+        # Step 3: Save to Vault (Inactive)
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now()}] Step 3: Saving to Vault (is_active=0)...\n")
+
         vault.save_tool(
             tool_name=data["name"],
             analysis=analysis,
@@ -718,9 +734,15 @@ async def background_audit_scouted_tool(url: str, description: str, submitter_em
             embedding=None,
             is_active=0
         )
-        print(f"[Background] Successfully scouted, audited, and hid {data['name']} for review.")
+        
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now()}] SUCCESS: Tool {data['name']} is now in the review queue.\n")
+
     except Exception as e:
-        print(f"[Background Auditor Exception]: {e}")
+        error_info = f"CRITICAL ERROR in background auditor: {str(e)}\n{traceback.format_exc()}"
+        print(f"[Background Auditor Exception]: {error_info}")
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now()}] {error_info}\n")
 
 
 @app.post("/community/contribute")
