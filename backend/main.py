@@ -478,6 +478,7 @@ def debug_firebase():
     from auth import is_firebase_ready, firebase_init_error
     import firebase_admin
     return {
+        "version": 2,
         "is_ready": is_firebase_ready,
         "init_error": firebase_init_error,
         "apps_count": len(firebase_admin._apps),
