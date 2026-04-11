@@ -473,21 +473,6 @@ def approve_tool(tool_name: str):
     vault.toggle_tool_status(tool_name, True)
     return {"status": "success", "message": f"Tool '{tool_name}' and is now live."}
 
-@app.get("/admin/debug/firebase")
-def debug_firebase():
-    from auth import is_firebase_ready, firebase_init_error
-    import firebase_admin
-    import os
-    raw_env = os.getenv("FIREBASE_SERVICE_ACCOUNT", "")
-    return {
-        "version": 3,
-        "is_ready": is_firebase_ready,
-        "init_error": firebase_init_error,
-        "first_5_chars": raw_env[:5] + "...",
-        "apps_count": len(firebase_admin._apps),
-        "project_id": os.getenv("VITE_FIREBASE_PROJECT_ID", "Not Set")
-    }
-
 @app.post("/admin/reject", dependencies=[Depends(verify_admin_user)])
 def reject_tool(tool_name: str):
     vault.delete_tool(tool_name)
