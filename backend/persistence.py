@@ -370,14 +370,30 @@ class AetherVault:
         conn.close()
         return [dict(r) for r in rows]
 
-    def toggle_tool_status(self, tool_name: str, is_active: bool):
-        """Enables or disables a tool (Kill Switch)."""
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("UPDATE verified_tools SET is_active = ? WHERE tool_name = ?", (1 if is_active else 0, tool_name.lower()))
-        conn.commit()
-        conn.close()
         print(f"[Vault] Tool '{tool_name}' set to active={is_active}")
+
+    def get_pending_tools(self) -> List[Dict]:
+        """
+        Fetches all tools that are currently hidden (is_active = 0) for admin review.
+        """
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM verified_tools WHERE is_active = 0 ORDER BY last_updated DESC")
+        rows = c.fetchall()
+        conn.close()
+        
+        results = []
+        for row in rows:
+            slug_id = row['tool_name'].strip().lower().replace(' ', '-')
+            results.append({
+                "id": slug_id,
+                "tool_name": row['tool_name'],
+                "trust_score": row['trust_score'],
+                "analysis": json.loads(row['analysis_json']),
+                "last_updated": row['last_updated']
+            })
+        return results
 
     def quick_update_pricing(self, tool_name: str, new_pricing: str):
         """Quickly updates the pricing model of a tool."""

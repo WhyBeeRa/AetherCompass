@@ -464,6 +464,20 @@ def get_analytics(admin_email: str = Depends(verify_admin_user)):
     """
     return vault.get_search_analytics(limit=100)
 
+@app.get("/admin/pending", dependencies=[Depends(verify_admin_user)])
+def get_pending_tools():
+    return vault.get_pending_tools()
+
+@app.post("/admin/approve", dependencies=[Depends(verify_admin_user)])
+def approve_tool(tool_name: str):
+    vault.toggle_tool_status(tool_name, True)
+    return {"status": "success", "message": f"Tool '{tool_name}' and is now live."}
+
+@app.post("/admin/reject", dependencies=[Depends(verify_admin_user)])
+def reject_tool(tool_name: str):
+    vault.delete_tool(tool_name)
+    return {"status": "success", "message": f"Tool '{tool_name}' was rejected and removed."}
+
 @app.post("/admin/vault/toggle/{name}", dependencies=[Depends(verify_admin_user)])
 async def toggle_tool_active(name: str, active: bool, admin_email: str = Depends(verify_admin_user)):
     """

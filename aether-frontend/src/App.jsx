@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from "react";
 import { Routes, Route, Link } from "react-router-dom";
-import { AlertCircle, Server, Shield, Settings as SettingsIcon, LogOut, User, BarChart3, PlusSquare, Scale, Zap, Activity, GitBranch, Coins } from "lucide-react";
+import { AlertCircle, Server, Shield, ShieldCheck, Settings as SettingsIcon, LogOut, User, BarChart3, PlusSquare, Scale, Zap, Activity, GitBranch, Coins } from "lucide-react";
 import SpaceBackground from "./components/SpaceBackground";
 import { useAuth } from "./AuthContext";
 
@@ -25,6 +25,7 @@ const Vault = lazy(() => import("./pages/Vault"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminVault = lazy(() => import("./pages/AdminVault"));
+const AdminRequests = lazy(() => import("./pages/AdminRequests"));
 const AetherInsiders = lazy(() => import("./pages/AetherInsiders"));
 const EloBattle = lazy(() => import("./pages/EloBattle"));
 const Compare = lazy(() => import("./pages/Compare"));
@@ -77,6 +78,10 @@ function App() {
               <Link to="/admin/analytics" className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 drop-shadow-[0_0_8px_rgba(129,140,248,0.3)] transition-all font-bold">
                 <BarChart3 className="w-3.5 h-3.5" />
                 Analytics
+              </Link>
+              <Link to="/admin/requests" className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all font-bold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Requests
               </Link>
             </>
           )}
@@ -144,6 +149,7 @@ function App() {
             <Route path="/privacy" element={<Privacy setAppError={setAppError} />} />
             <Route path="/admin/vault" element={<AdminVault />} />
             <Route path="/admin/analytics" element={<AdminAnalytics setAppError={setAppError} />} />
+            <Route path="/admin/requests" element={<AdminRequests setAppError={setAppError} />} />
             <Route path="/insiders" element={<AetherInsiders setAppError={setAppError} />} />
             <Route path="/insiders/battle" element={<EloBattle setAppError={setAppError} />} />
             <Route path="/compare" element={<Compare setAppError={setAppError} />} />
