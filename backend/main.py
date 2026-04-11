@@ -27,7 +27,7 @@ from firebase_admin import auth as firebase_auth
 from community_logic import calculate_elo_change, check_for_badges
 from models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
 from pydantic import BaseModel
-from admin_auditor import run_vault_audit
+from admin_auditor import run_lean_audit
 
 class AuditRequest(BaseModel):
     url: str
@@ -369,7 +369,7 @@ async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(v
     Runs the automated Vault Auditor on a single URL and saves it to the Vault as hidden (is_active: 0).
     """
     try:
-        response = await run_vault_audit(request.url)
+        response = await run_lean_audit(request.url)
         if response.get("status") == "error":
             raise HTTPException(status_code=500, detail=response.get("reason", "Auditor failed"))
             
@@ -389,9 +389,10 @@ async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(v
             visual_quality=VisualQuality.MID,
             job_to_be_done=[data["category"]],
             executive_summary=data["community_consensus"],
-            pros=data["pros"],
-            cons=data["cons"],
-            use_cases=[data["category"]]
+            pros=[],
+            cons=[],
+            use_cases=[data["category"]],
+            audit_notes=data["audit_notes"]
         )
 
         audit_log = AuditLog(
@@ -407,11 +408,9 @@ async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(v
             trust_score=float(data["trust_score"]),
             gallery=[],
             audit_log=audit_log,
-            embedding=None
+            embedding=None,
+            is_active=0
         )
-        
-        # Hide by default as requested
-        vault.toggle_tool_status(data["name"], False)
 
         return {"status": "success", "message": f"Tool '{data['name']}' audited and saved as hidden.", "data": data}
 
@@ -662,7 +661,7 @@ def get_leaderboard():
 async def background_audit_scouted_tool(url: str, description: str, submitter_email: str):
     print(f"[Background] Starting AI Audit for scouted tool: {url}")
     try:
-        response = await run_vault_audit(url)
+        response = await run_lean_audit(url)
         if response.get("status") == "error":
             print(f"[Background Auditor Error] {response.get('reason')}")
             return
@@ -682,10 +681,11 @@ async def background_audit_scouted_tool(url: str, description: str, submitter_em
             ),
             visual_quality=VisualQuality.MID,
             job_to_be_done=[data.get("category", "General")],
-            executive_summary=description or data.get("community_consensus", ""),
-            pros=data.get("pros", []),
-            cons=data.get("cons", []),
-            use_cases=[data.get("category", "General")]
+            executive_summary=data.get("community_consensus", ""),
+            pros=[],
+            cons=[],
+            use_cases=[data.get("category", "General")],
+            audit_notes=data.get("audit_notes", "")
         )
 
         audit_log = AuditLog(
@@ -701,11 +701,9 @@ async def background_audit_scouted_tool(url: str, description: str, submitter_em
             trust_score=float(data.get("trust_score", 50)),
             gallery=[],
             audit_log=audit_log,
-            embedding=None
+            embedding=None,
+            is_active=0
         )
-        
-        # Hide by default for admin review
-        vault.toggle_tool_status(data["name"], False)
         print(f"[Background] Successfully scouted, audited, and hid {data['name']} for review.")
     except Exception as e:
         print(f"[Background Auditor Exception]: {e}")

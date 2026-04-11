@@ -170,6 +170,7 @@ class LabAnalysis(BaseModel):
     
     # THE LAB: PROOF OF MEASUREMENT (Audit Logs)
     measurement_proofs: List[MeasurementProof] = Field(default_factory=list, description="Raw data samples from direct testing")
+    audit_notes: Optional[str] = Field(default="", description="Red flags or critical warnings about the tool")
 
     # Deep Intelligence Fields (Phase 7)
 

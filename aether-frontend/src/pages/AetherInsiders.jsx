@@ -14,11 +14,23 @@ const AetherInsiders = ({ setAppError }) => {
   const [scouting, setScouting] = useState(false);
 
   useEffect(() => {
-    const fetchProfileAndLeaderboard = async () => {
+    const fetchLeaderboard = async () => {
+      try {
+        const leaderboardRes = await fetch(`${import.meta.env.VITE_API_URL}/community/leaderboard`);
+        if (leaderboardRes.ok) {
+          const lbData = await leaderboardRes.json();
+          setLeaderboard(lbData);
+        }
+      } catch (err) {
+        console.error("Error fetching leaderboard data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchProfile = async () => {
       try {
         const idToken = await currentUser.getIdToken();
-        
-        // Sync/Fetch Profile
         const profileRes = await fetch(`${import.meta.env.VITE_API_URL}/community/profile`, {
           method: 'POST',
           headers: {
@@ -31,23 +43,15 @@ const AetherInsiders = ({ setAppError }) => {
           const profileData = await profileRes.json();
           setProfile(profileData);
         }
-
-        // Fetch Leaderboard
-        const leaderboardRes = await fetch(`${import.meta.env.VITE_API_URL}/community/leaderboard`);
-        if (leaderboardRes.ok) {
-          const lbData = await leaderboardRes.json();
-          setLeaderboard(lbData);
-        }
       } catch (err) {
-        console.error("Error fetching community data:", err);
-        if (setAppError) setAppError("נכשל בטעינת נתוני הקהילה");
-      } finally {
-        setLoading(false);
+        console.error("Error fetching profile:", err);
+        if (setAppError) setAppError("נכשל בטעינת פרופיל משתמש");
       }
     };
 
+    fetchLeaderboard();
     if (currentUser) {
-      fetchProfileAndLeaderboard();
+      fetchProfile();
     }
   }, [currentUser, setAppError]);
 
@@ -98,71 +102,93 @@ const AetherInsiders = ({ setAppError }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* User Status Card */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-cyan-500/20 transition-all duration-500" />
-            
-            <div className="flex flex-col items-center text-center space-y-6 relative z-10">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 p-1">
-                  <div className="w-full h-full rounded-full bg-[#040914] flex items-center justify-center text-3xl font-black text-white italic">
-                    {currentUser?.displayName?.[0] || currentUser?.email?.[0]}
+          {currentUser ? (
+            <>
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-cyan-500/20 transition-all duration-500" />
+                
+                <div className="flex flex-col items-center text-center space-y-6 relative z-10">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600 p-1">
+                      <div className="w-full h-full rounded-full bg-[#040914] flex items-center justify-center text-3xl font-black text-white italic">
+                        {currentUser?.displayName?.[0] || currentUser?.email?.[0]}
+                      </div>
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 bg-yellow-500 text-[#040914] p-1.5 rounded-lg shadow-lg">
+                      <Star className="w-4 h-4 fill-current" />
+                    </div>
                   </div>
-                </div>
-                <div className="absolute -bottom-2 -right-2 bg-yellow-500 text-[#040914] p-1.5 rounded-lg shadow-lg">
-                  <Star className="w-4 h-4 fill-current" />
+
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight text-white italic">
+                      {profile?.display_name || "Agent Scout"}
+                    </h3>
+                    <p className="text-white/40 text-sm font-medium uppercase tracking-widest mt-1">
+                       {profile?.badges?.[profile?.badges?.length - 1] || "New Member"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 w-full gap-4">
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                      <span className="text-[10px] text-white/40 uppercase font-black block mb-1">XP Points</span>
+                      <span className="text-2xl font-black text-cyan-400">{profile?.points || 0}</span>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                      <span className="text-[10px] text-white/40 uppercase font-black block mb-1">Avg ELO</span>
+                      <span className="text-2xl font-black text-indigo-400">{profile?.elo || 1200}</span>
+                    </div>
+                  </div>
+
+                  <button className="w-full py-4 bg-gradient-to-r from-cyan-500 to-indigo-600 rounded-2xl text-white font-black italic tracking-tight hover:scale-105 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
+                    <Swords className="w-5 h-5" />
+                    BATTLES (PHASE 2)
+                  </button>
+                  
+                  <button 
+                    onClick={() => setShowScoutModal(true)}
+                    className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-white/80 font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Target className="w-4 h-4 text-cyan-400" />
+                    SCOUT NEW TOOL
+                  </button>
                 </div>
               </div>
 
+              {/* Badges Display */}
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
+                <h4 className="text-sm font-black text-white/40 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  BADGES EARNED
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {profile?.badges?.map((badge, idx) => (
+                    <span key={idx} className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full text-xs font-bold">
+                      {badge}
+                    </span>
+                  ))}
+                  {!profile?.badges?.length && <p className="text-white/20 text-sm italic">מחל לדרג כלים כדי לקבל תגים...</p>}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl relative overflow-hidden group flex flex-col items-center text-center space-y-6">
+              <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center">
+                <Shield className="w-10 h-10 text-white/20" />
+              </div>
               <div>
                 <h3 className="text-2xl font-bold tracking-tight text-white italic">
-                  {profile?.display_name || "Agent Scout"}
+                  JOIN THE INSIDERS
                 </h3>
-                <p className="text-white/40 text-sm font-medium uppercase tracking-widest mt-1">
-                   {profile?.badges?.[profile?.badges?.length - 1] || "New Member"}
+                <p className="text-white/40 text-sm font-medium mt-2">
+                  התחבר כדי לצבור XP, לגלות כלים חדשים ולעצב את דירוגי האמת של הקהילה.
                 </p>
               </div>
-
-              <div className="grid grid-cols-2 w-full gap-4">
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                  <span className="text-[10px] text-white/40 uppercase font-black block mb-1">XP Points</span>
-                  <span className="text-2xl font-black text-cyan-400">{profile?.points || 0}</span>
-                </div>
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                  <span className="text-[10px] text-white/40 uppercase font-black block mb-1">Avg ELO</span>
-                  <span className="text-2xl font-black text-indigo-400">{profile?.elo || 1200}</span>
-                </div>
-              </div>
-
-              <Link to="/insiders/battle" className="w-full py-4 bg-gradient-to-r from-cyan-500 to-indigo-600 rounded-2xl text-white font-black italic tracking-tight hover:scale-105 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center gap-2">
-                <Swords className="w-5 h-5" />
-                START ELO BATTLE
+              <Link to="/activation" className="w-full py-4 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-2xl font-black italic tracking-tight hover:bg-cyan-500/20 transition-all flex items-center justify-center gap-2">
+                <Zap className="w-5 h-5" />
+                LOG IN TO PARTICIPATE
               </Link>
-              
-              <button 
-                onClick={() => setShowScoutModal(true)}
-                className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-white/80 font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-              >
-                <Target className="w-4 h-4 text-cyan-400" />
-                SCOUT NEW TOOL
-              </button>
             </div>
-          </div>
-
-          {/* Badges Display */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
-            <h4 className="text-sm font-black text-white/40 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              BADGES EARNED
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              {profile?.badges?.map((badge, idx) => (
-                <span key={idx} className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-full text-xs font-bold">
-                  {badge}
-                </span>
-              ))}
-              {!profile?.badges?.length && <p className="text-white/20 text-sm italic">מחל לדרג כלים כדי לקבל תגים...</p>}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Global Leaderboard */}

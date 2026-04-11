@@ -127,7 +127,7 @@ class AetherVault:
         conn.commit()
         conn.close()
 
-    def save_tool(self, tool_name: str, analysis: LabAnalysis, trust_score: float, gallery: List[GalleryItem], audit_log: AuditLog, embedding: Optional[List[float]] = None):
+    def save_tool(self, tool_name: str, analysis: LabAnalysis, trust_score: float, gallery: List[GalleryItem], audit_log: AuditLog, embedding: Optional[List[float]] = None, is_active: int = 1):
         """
         Saves a fully verified tool to the Vault.
 
@@ -163,9 +163,9 @@ class AetherVault:
                   
         # Upsert into Verified Tools
         c.execute('''INSERT OR REPLACE INTO verified_tools 
-                     (tool_name, last_updated, trust_score, intent_category, analysis_json, gallery_json, embedding_json)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                  (tool_name.lower(), timestamp, trust_score, str(analysis.job_to_be_done), analysis_json, gallery_json, embedding_json))
+                     (tool_name, last_updated, trust_score, intent_category, analysis_json, gallery_json, embedding_json, is_active)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (tool_name.lower(), timestamp, trust_score, str(analysis.job_to_be_done), analysis_json, gallery_json, embedding_json, is_active))
         
         # Log Audit
         c.execute('''INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)

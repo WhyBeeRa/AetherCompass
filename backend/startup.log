@@ -1,2 +1,6 @@
 !!! LOADING ENV FROM: /app/.env
 .env file exists
+>>> Firebase Admin: Initialized without credentials (limited functionality)
+>>> CALLING initialize_firebase_admin()
+>>> CALLING initialize_firebase_admin()
+>>> Firebase Admin already initialized. Skipping.
