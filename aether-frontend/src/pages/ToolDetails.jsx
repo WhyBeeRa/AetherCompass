@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, AlertTriangle, ExternalLink, CheckCircle2, XCircle, Terminal, FileText, Activity } from 'lucide-react';
 import { apiFetch } from '../api';
+import ToolDetailsSkeleton from '../components/ToolDetailsSkeleton';
 
 export default function ToolDetails({ setAppError }) {
     const { id } = useParams();
@@ -71,11 +72,7 @@ export default function ToolDetails({ setAppError }) {
     }, [id, navigate, setAppError]);
 
     if (isLoading) {
-        return (
-            <div className="min-h-[70vh] flex flex-col items-center justify-center w-full animate-in fade-in duration-500">
-                <span className="text-white/60 font-medium text-sm tracking-widest uppercase">מאחזר נתונים מהכספת...</span>
-            </div>
-        );
+        return <ToolDetailsSkeleton />;
     }
 
     if (!tool) return null;

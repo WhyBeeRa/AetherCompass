@@ -71,9 +71,10 @@ def verify_admin_user(authorization: str = Header(None)) -> str:
 
     try:
         decoded_token = auth.verify_id_token(token)
-        email = decoded_token.get("email")
+        email = decoded_token.get("email", "").lower()
+        admin_emails_lower = [e.lower() for e in admin_emails]
         
-        if email not in admin_emails:
+        if email not in admin_emails_lower:
             print(f"[Auth] Access denied for {email}. Not in admin list.")
             raise HTTPException(status_code=403, detail=f"Not Authorized: {email} is not an admin")
             

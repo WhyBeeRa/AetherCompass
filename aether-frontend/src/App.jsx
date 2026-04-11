@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState } from "react";
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, Navigate } from "react-router-dom";
 import { AlertCircle, Server, Shield, ShieldCheck, Settings as SettingsIcon, LogOut, User, BarChart3, PlusSquare, Scale, Zap, Activity, GitBranch, Coins } from "lucide-react";
 import SpaceBackground from "./components/SpaceBackground";
 import { useAuth } from "./AuthContext";
@@ -48,9 +48,17 @@ function App() {
       {/* 1. Enterprise Header - PERSISTENT OUTSIDE ROUTES */}
       <header className="sticky top-0 z-50 w-full bg-[#040914]/80 backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Link to="/" className="flex flex-col items-center gap-1.5 hover:opacity-80 transition-opacity" dir="ltr">
-            <img src="/logo.png.png" alt="Aether Logo" className="h-20 w-auto object-contain drop-shadow-md" />
-            <span className="text-[0.65rem] font-medium text-white/50 tracking-widest uppercase leading-none mt-1">The Ultimate AI Compass</span>
+          <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-all group" dir="ltr">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+                A
+              </div>
+              <div className="absolute -inset-1 bg-cyan-400/20 blur-lg rounded-full -z-10 group-hover:bg-cyan-400/30 transition-colors"></div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold tracking-tight text-white">Aether</span>
+              <span className="text-[0.65rem] font-medium text-white/40 tracking-[0.2em] uppercase leading-none">Compass</span>
+            </div>
           </Link>
         </div>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/50">
@@ -155,8 +163,8 @@ function App() {
             <Route path="/compare" element={<Compare setAppError={setAppError} />} />
             <Route path="/vendor/insights" element={<VendorInsights />} />
 
-            {/* Catch All 404 */}
-            <Route path="*" element={<NotFound />} />
+            {/* Catch All 404 Redirect to Home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </main>
@@ -199,10 +207,10 @@ function App() {
         </div>
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between pt-8 border-t border-white/5 text-xs text-white/70">
           <span>© 2026 Aether AI. כל הזכויות שמורות.</span>
-          <div className="flex items-center gap-3 mt-4 md:mt-0 opacity-60 hover:opacity-100 transition-all duration-300" dir="ltr">
+          <div className="flex items-center gap-3 mt-4 md:mt-0 opacity-80 hover:opacity-100 transition-all duration-300" dir="ltr">
             <div className="flex flex-col items-center justify-center gap-2">
-              <img src="/logo.png.png" alt="Aether Logo" className="h-12 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-300" />
-              <span className="text-[0.55rem] tracking-wider text-white/60 uppercase leading-none">The Ultimate AI Compass</span>
+              <span className="text-lg font-bold tracking-tight text-white/80">Aether <span className="text-cyan-500">Compass</span></span>
+              <span className="text-[0.55rem] tracking-widest text-white/30 uppercase leading-none">The Ultimate AI Navigator</span>
             </div>
           </div>
         </div>

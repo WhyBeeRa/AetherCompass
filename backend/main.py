@@ -217,22 +217,8 @@ def get_gallery_feed():
     """
     # 1. SPONSORED/PROMOTED SLOT (Logic Injection)
     # in a real app, this comes from an Ad Server based on User Intent
-    sponsored_items = [
-        {
-            "tool_name": "Jasper Enterprise",
-            "title": "Jasper Enterprise",
-            "summary": "AI marketing platform built for enterprise scale. Brand voice consistency and SOC2 compliance.",
-            "trust_score": 98.0, # High trust even for ads
-            "source": "Aether Promoted",
-            "type": "tool",
-            "is_sponsored": True,
-            "media_url": "https://images.unsplash.com/photo-1661956602116-aa6865609028?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-            "prompt_recipe": {"prompt": "Enterprise marketing campaign"},
-            "style_tags": ["Enterprise", "Marketing"],
-            "trust_badge_visible": True
-        }
-        # Add more if needed, typically 1-3 slots
-    ]
+    sponsored_items = []
+
     
     # 2. ORGANIC / VERIFIED SLOT (from Vault)
     # retrieving everything from the vault
@@ -268,7 +254,7 @@ def get_gallery_feed():
         }
 
         # If there's a gallery, use the first image for the card, else use a placeholder
-        media_url = "https://images.unsplash.com/photo-1620712948343-0008cc890752?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+        media_url = "C:/Users/Yuval/.gemini/antigravity/brain/edcea81f-32d1-4067-8b20-d3b26c1e4a91/aether_evidence_placeholder_1775911102864.png"
         if data.get("gallery") and len(data["gallery"]) > 0:
              media_url = data["gallery"][0].get("media_url", media_url)
              
@@ -473,6 +459,10 @@ def approve_tool(tool_name: str):
     vault.toggle_tool_status(tool_name, True)
     return {"status": "success", "message": f"Tool '{tool_name}' and is now live."}
 
+@app.get("/admin/live-scans", dependencies=[Depends(verify_admin_user)])
+def get_live_scans():
+    return vault.get_live_scans()
+
 @app.post("/admin/reject", dependencies=[Depends(verify_admin_user)])
 def reject_tool(tool_name: str):
     vault.delete_tool(tool_name)
@@ -672,20 +662,25 @@ async def submit_vote(vote: EloBattleVote, user_data: Dict = Depends(get_current
 def get_leaderboard():
     return vault.get_user_rankings(limit=20)
 
-async def background_audit_scouted_tool(url: str, description: str, submitter_email: str):
+async def background_audit_scouted_tool(task_id: int, url: str, description: str, submitter_email: str):
     log_file = "background_tasks.log"
     with open(log_file, "a") as f:
         f.write(f"\n[{datetime.now()}] STARTING AUDIT: {url} (requested by {submitter_email})\n")
 
     try:
+        # Update task status to scanning
+        vault.update_scout_task(task_id, "scanning")
+        
         # Step 1: Run Scraper + Gemini Audit
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] Step 1: Running Agent Scan...\n")
 
         response = await run_lean_audit(url)
         if response.get("status") == "error":
+            reason = response.get("reason", "Unknown error")
             with open(log_file, "a") as f:
-                f.write(f"[{datetime.now()}] FAIL: Auditor returned error: {response.get('reason')}\n")
+                f.write(f"[{datetime.now()}] FAIL: Auditor returned error: {reason}\n")
+            vault.update_scout_task(task_id, "failed", reason)
             return
             
         data = response["audit_data"]
@@ -735,12 +730,16 @@ async def background_audit_scouted_tool(url: str, description: str, submitter_em
             is_active=0
         )
         
+        # Update task to completed
+        vault.update_scout_task(task_id, "completed")
+        
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] SUCCESS: Tool {data['name']} is now in the review queue.\n")
 
     except Exception as e:
         error_info = f"CRITICAL ERROR in background auditor: {str(e)}\n{traceback.format_exc()}"
         print(f"[Background Auditor Exception]: {error_info}")
+        vault.update_scout_task(task_id, "failed", str(e))
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] {error_info}\n")
 
@@ -764,8 +763,11 @@ async def contribute_tool(contribution: ToolContribution, background_tasks: Back
         
     vault.update_user(profile)
     
+    # Create the scout task and pass its ID to the background
+    task_id = vault.create_scout_task(contribution.name, contribution.url, email)
+    
     # Run the Vault Auditor in the background
-    background_tasks.add_task(background_audit_scouted_tool, contribution.url, contribution.description, email)
+    background_tasks.add_task(background_audit_scouted_tool, task_id, contribution.url, contribution.description, email)
     
     print(f"[Community] New tool Scouted by {email}: {contribution.name} ({contribution.url}). Audit queued.")
     
@@ -809,10 +811,40 @@ async def trigger_live_benchmark(background_tasks: BackgroundTasks, admin_email:
     """
     Manually triggers a live benchmark cycle.
     """
+    print(f"[Admin] Live benchmark cycle triggered by {admin_email}")
     from live_benchmarking import LiveMonitor
     monitor = LiveMonitor(vault)
     background_tasks.add_task(monitor.run_benchmark_cycle)
     return {"status": "success", "message": "Live benchmark cycle triggered in background."}
+@app.post("/admin/discovery/trigger", dependencies=[Depends(verify_admin_user)])
+async def trigger_autonomous_discovery(background_tasks: BackgroundTasks, admin_email: str = Depends(verify_admin_user)):
+    """
+    The 'Super Scout'. Triggers autonomous agents to find new AI tools online.
+    """
+    print(f"[Admin] Autonomous Discovery triggered by {admin_email}")
+    
+    async def discovery_task():
+        # High-potential categories to scan
+        intents = [
+            "Hot new AI tools for software developers",
+            "Trending generative AI for video and audio",
+            "Latest LLM tools on Reddit and ProductHunt",
+            "Innovative AI automation agents"
+        ]
+        for intent in intents:
+            try:
+                # We use the pipeline to Discover -> Audit -> Save
+                # Note: Pipeline saves as 'is_active=1' by default, 
+                # but we might want them hidden for admin review.
+                # For now we'll follow current pipeline logic.
+                await pipeline.run_pipeline(intent)
+                await asyncio.sleep(5) # Give it some breathing room
+            except Exception as e:
+                print(f"[Discovery Error] Failed intent '{intent}': {e}")
+
+    background_tasks.add_task(discovery_task)
+    return {"status": "success", "message": "Autonomous scouting cycle triggered in background."}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

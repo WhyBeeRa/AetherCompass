@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Activity, Box, GitBranch, Coins, Zap, ArrowRight } from 'lucide-react';
 import { apiFetch } from '../api';
+import PremiumSearchSkeleton from '../components/PremiumSearchSkeleton';
 
 export default function Home({ setAppError }) {
     const [query, setQuery] = useState('');
@@ -44,9 +45,9 @@ export default function Home({ setAppError }) {
         } catch (error) {
             console.error(error);
             if (error.name === 'AbortError') {
-                setAppError("חיפוש מורכב זה לוקח זמן רב מדי. אנא נסה למקד את החיפוש.");
+                setAppError("עיבוד הנתונים המעמיק אורך זמן רב מהרגיל עקב עומס על מודלי הליבה. אנא נסה שוב בעוד רגע.");
             } else {
-                setAppError(error.message || "המנוע תחת עומס. נסה שוב בעוד מספר רגעים.");
+                setAppError(error.message || "מנוע ההכוונה חווה עומס רגעיי. המערכת תתאושש בקרוב.");
             }
         } finally {
             clearTimeout(timeoutId);
@@ -91,11 +92,14 @@ export default function Home({ setAppError }) {
                                 disabled={isSearching || !query.trim()}
                                 className="px-6 py-2.5 rounded-2xl bg-white/20 backdrop-blur-md border border-white/10 hover:bg-white/10 backdrop-blur-md disabled:bg-white/10 backdrop-blur-md disabled:border-white/20 disabled:text-white/50 text-white text-sm font-semibold transition-all shadow-md"
                             >
-                                {isSearching ? 'Analyzing Intent...' : hasResults ? 'חפש שוב' : 'התאם לי כלי'}
+                                {isSearching ? 'מנתח כוונת משתמש...' : hasResults ? 'חפש שוב' : 'התאם לי כלי'}
                             </button>
                         </div>
                     </div>
                 </form>
+
+                {/* מצב 2: The Premium Skeleton (Searching State) */}
+                {isSearching && <PremiumSearchSkeleton />}
 
                 {/* מצב 1: הצעות לפרומפטים (Idle State) */}
                 {!hasResults && !isSearching && (

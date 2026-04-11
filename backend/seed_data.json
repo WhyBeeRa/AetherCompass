@@ -1,14 +1,1 @@
-[
-    {
-        "tool_name": "Zapier",
-        "category": "Automation",
-        "intents_mapped": [
-            {
-                "intent_description": "Automating email workflows between Gmail and Slack",
-                "success_score": 9,
-                "source": "Reddit - Mock",
-                "original_url": "https://reddit.com/mock"
-            }
-        ]
-    }
-]
+[]

@@ -36,8 +36,8 @@ export function AuthProvider({ children }) {
     }, []);
 
     const isAdmin = currentUser?.email && (
-        currentUser.email === "yuval@example.com" || 
-        import.meta.env.VITE_ADMIN_EMAILS?.split(',').map(e => e.trim()).includes(currentUser.email)
+        currentUser.email.toLowerCase() === "yuval@example.com" || 
+        import.meta.env.VITE_ADMIN_EMAILS?.toLowerCase().split(',').map(e => e.trim()).includes(currentUser.email.toLowerCase())
     );
 
     const value = {

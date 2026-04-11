@@ -210,13 +210,47 @@ export default function AdminVault() {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
             if (response.ok) {
-                alert("Live benchmark cycle triggered in background.");
+                setSubmitResult({ 
+                    type: 'success', 
+                    message: "סריקת ביצועים (Live Scan) הופעלה בהצלחה ברקע. הנתונים יעודכנו בדקות הקרובות." 
+                });
+                // Clear message after 5 seconds
+                setTimeout(() => setSubmitResult(null), 5000);
             } else {
-                throw new Error("Trigger failed");
+                throw new Error("כשל בהפעלת הסריקה");
             }
         } catch (err) {
-            alert("Error triggering benchmark: " + err.message);
+            setSubmitResult({ 
+                type: 'error', 
+                message: "שגיאה בהפעלת הסריקה: " + err.message 
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const triggerDiscoveryScan = async () => {
+        try {
+            setIsSubmitting(true);
+            const token = await currentUser.getIdToken();
+            const response = await apiFetch('/admin/discovery/trigger', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (response.ok) {
+                setSubmitResult({ 
+                    type: 'success', 
+                    message: "יצאנו לדרך! הסורק האוטונומי מחפש עכשיו כלים חדשים ב-Reddit, GitHub ומקורות נוספים. הכלים יתווספו לכספת בקרוב." 
+                });
+                setTimeout(() => setSubmitResult(null), 8000);
+            } else {
+                throw new Error("כשל בהפעלת סורק הגילוי");
+            }
+        } catch (err) {
+            setSubmitResult({ type: 'error', message: "שגיאה: " + err.message });
         } finally {
             setIsSubmitting(false);
         }
@@ -225,7 +259,7 @@ export default function AdminVault() {
     return (
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-24 min-h-screen text-slate-200" dir="ltr">
             
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white mb-2 flex items-center gap-3">
                         <ShieldAlert className="w-8 h-8 text-cyan-400" />
@@ -233,14 +267,26 @@ export default function AdminVault() {
                     </h1>
                     <p className="text-white/50 text-sm">Manual Vault Entry System • Logged in as <span className="text-white/80">{currentUser.email}</span></p>
                 </div>
-                <button 
-                    onClick={triggerLiveBenchmark}
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl text-sm font-bold hover:bg-cyan-500/20 transition-all"
-                >
-                    <Activity className={`w-4 h-4 ${isSubmitting ? 'animate-pulse' : ''}`} />
-                    Trigger Live Scan
-                </button>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                    <button 
+                        onClick={triggerDiscoveryScan}
+                        disabled={isSubmitting}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl text-sm font-bold hover:bg-purple-500/20 transition-all shadow-[0_0_15px_rgba(168,85,247,0.1)]"
+                    >
+                        <Search className={`w-4 h-4 ${isSubmitting ? 'animate-pulse' : ''}`} />
+                        סריקת גילוי (Reddit Scout)
+                    </button>
+
+                    <button 
+                        onClick={triggerLiveBenchmark}
+                        disabled={isSubmitting}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl text-sm font-bold hover:bg-cyan-500/20 transition-all"
+                    >
+                        <Activity className={`w-4 h-4 ${isSubmitting ? 'animate-pulse' : ''}`} />
+                        בדיקת ביצועים (Live Metrics)
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -269,7 +315,11 @@ export default function AdminVault() {
 
                     <form onSubmit={handleSubmit} className="bg-white/[0.02] border border-white/5 p-8 rounded-3xl backdrop-blur-sm relative">
                         
-                        {/* --- STEP 1: BASIC INFO --- */}
+                        {submitResult && (
+                            <div className={`mb-6 p-4 rounded-xl border ${submitResult.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'} text-sm animate-in fade-in slide-in-from-top-2`}>
+                                {submitResult.message}
+                            </div>
+                        )}
                         {step === 1 && (
                             <div className="space-y-6 animate-in slide-in-from-right fade-in">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -448,12 +498,6 @@ export default function AdminVault() {
                                         You are about to inject raw data into the Aether Vault. Ensure all metrics and assessments are objective and free of marketing hype. This action will be logged under your administrative identity.
                                     </p>
                                 </div>
-
-                                {submitResult && (
-                                    <div className={`p-4 rounded-xl border ${submitResult.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'} text-sm`}>
-                                        {submitResult.message}
-                                    </div>
-                                )}
                             </div>
                         )}
 

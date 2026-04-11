@@ -36,6 +36,17 @@ class AetherVault:
                         embedding_json TEXT,  -- Storing numpy vectors as JSON array
                         is_active INTEGER DEFAULT 1 -- 1 for active, 0 for hidden
                     )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS scout_tasks (
+                task_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tool_name TEXT,
+                url TEXT,
+                submitter_email TEXT,
+                status TEXT DEFAULT 'pending', -- pending, scanning, completed, failed
+                error_message TEXT,
+                created_at TIMESTAMP,
+                updated_at TIMESTAMP
+            )''')
                     
         # Apply schema migration for is_active column
         try:
@@ -370,7 +381,41 @@ class AetherVault:
         conn.close()
         return [dict(r) for r in rows]
 
-        print(f"[Vault] Tool '{tool_name}' set to active={is_active}")
+    def update_tool_status(self, tool_name: str, status: int):
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("UPDATE verified_tools SET is_active = ? WHERE tool_name = ?", (status, tool_name.lower()))
+        conn.commit()
+        conn.close()
+
+    def create_scout_task(self, tool_name: str, url: str, email: str) -> int:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        now = datetime.now()
+        c.execute("INSERT INTO scout_tasks (tool_name, url, submitter_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                  (tool_name, url, email, now, now))
+        task_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        return task_id
+
+    def update_scout_task(self, task_id: int, status: str, error_message: str = None):
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ? WHERE task_id = ?",
+                  (status, error_message, datetime.now(), task_id))
+        conn.commit()
+        conn.close()
+
+    def get_live_scans(self) -> List[Dict]:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        # Keep only recent tasks or non-completed ones
+        c.execute("SELECT * FROM scout_tasks WHERE status IN ('pending', 'scanning', 'failed') OR (status = 'completed' AND updated_at > datetime('now', '-1 hour')) ORDER BY updated_at DESC")
+        rows = c.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
 
     def get_pending_tools(self) -> List[Dict]:
         """

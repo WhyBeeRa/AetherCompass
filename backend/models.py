@@ -48,7 +48,7 @@ class AITool(BaseModel):
     id: str
     name: str
     description: str
-    website_url: HttpUrl
+    website_url: str # Free, Freemium, Paid
     pricing_model: str # Free, Freemium, Paid
     
     # Trust Engine Data
@@ -61,7 +61,7 @@ class AITool(BaseModel):
     tags: List[str] = Field(default_factory=list)
     
     # Social Proof
-    gallery_images: List[HttpUrl] = Field(default_factory=list)
+    gallery_images: List[str] = Field(default_factory=list)
     reviews: List[ToolReview] = Field(default_factory=list)
 
     class Config:
@@ -71,8 +71,8 @@ class VisualProof(BaseModel):
     """
     Direct evidence of a tool's capability.
     """
-    url: HttpUrl
-    source_url: HttpUrl = Field(..., description="Where this proof was found (Tweet, Discord, etc.)")
+    url: str
+    source_url: str = Field(..., description="Where this proof was found (Tweet, Discord, etc.)")
     media_type: str = "image" # image, video, code_snippet
     description: Optional[str] = None
 
@@ -208,7 +208,7 @@ class GalleryItem(BaseModel):
     Pinterest-style showcase item.
     """
     tool_id: str
-    media_url: HttpUrl
+    media_url: str
     media_type: str = "image"
     
     # Search & Discovery

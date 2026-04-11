@@ -5,6 +5,23 @@ import { useAuth } from '../AuthContext';
 import LiveMonitorWidget from '../components/LiveMonitorWidget';
 import { apiFetch } from '../api';
 
+// Search Analytics Logger Component
+const SearchLogger = ({ query }) => {
+    useEffect(() => {
+        if (!query || query.trim().length < 2) return;
+        
+        const timeoutId = setTimeout(() => {
+            // Signal the backend to log this search (runs in background)
+            apiFetch(`/vault/search?q=${encodeURIComponent(query)}`)
+                .catch(err => console.warn("Analytics log failed", err));
+        }, 1500); // 1.5s debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [query]);
+    
+    return null;
+};
+
 const Vault = ({ setAppError }) => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -228,6 +245,9 @@ const Vault = ({ setAppError }) => {
                             />
                         </div>
                     </div>
+                    
+                    {/* Search Analytics Logger (Background) */}
+                    <SearchLogger query={searchQuery} />
                     
                     {isAdmin && (
                         <div className="p-4 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
