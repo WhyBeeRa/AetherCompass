@@ -9,3 +9,5 @@ openai
 google-genai
 numpy
 firebase-admin
+beautifulsoup4
+duckduckgo-search

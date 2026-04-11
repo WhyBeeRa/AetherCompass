@@ -18,14 +18,22 @@ import uuid
 import json
 import os
 from pathlib import Path
-from .pipeline import AetherPipeline
-from .models import GalleryItem, LabAnalysis, TrustScore, ToolMetrics, VisualQuality, AuditLog, ManualToolEntry
-from .auth import verify_admin_user, initialize_firebase_admin
+from pipeline import AetherPipeline
+from models import GalleryItem, LabAnalysis, TrustScore, ToolMetrics, VisualQuality, AuditLog, ManualToolEntry
+from auth import verify_admin_user, initialize_firebase_admin
 initialize_firebase_admin()
 from fastapi import Request, Depends
 from firebase_admin import auth as firebase_auth
-from .community_logic import calculate_elo_change, check_for_badges
-from .models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
+from community_logic import calculate_elo_change, check_for_badges
+from models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
+from pydantic import BaseModel
+from admin_auditor import run_vault_audit
+
+class AuditRequest(BaseModel):
+    url: str
+    
+class BulkAuditRequest(BaseModel):
+    urls: List[str]
 
 app = FastAPI(title="Aeather API", description="Backend for the Agentic Grid", version="0.2.0")
 
@@ -68,11 +76,11 @@ def get_current_user(authorization: str = Header(None)) -> Dict:
 pipeline = AetherPipeline()
 
 # Initialize Vault (Persistence Layer)
-from .persistence import AetherVault
+from persistence import AetherVault
 vault = AetherVault()
 
 # Initialize Semantic Search Engine
-from .search_engine import AetherSearchEngine
+from search_engine import AetherSearchEngine
 search_engine = AetherSearchEngine()
 
 @app.on_event("startup")
@@ -354,6 +362,81 @@ async def add_manual_tool(tool_data: ManualToolEntry, request: Request, admin_em
     except Exception as e:
         print(f"[Admin Error] Failed to add tool: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/auditor/manual", dependencies=[Depends(verify_admin_user)])
+async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(verify_admin_user)):
+    """
+    Runs the automated Vault Auditor on a single URL and saves it to the Vault as hidden (is_active: 0).
+    """
+    try:
+        response = await run_vault_audit(request.url)
+        if response.get("status") == "error":
+            raise HTTPException(status_code=500, detail=response.get("reason", "Auditor failed"))
+            
+        data = response["audit_data"]
+        
+        analysis = LabAnalysis(
+            tool_name=data["name"],
+            metrics=ToolMetrics(
+                accuracy=4, speed=4, value=4, ease_of_use=4,
+                pricing=data["pricing_model"],
+                learning_curve="בינוני", # Default
+                latency_label="Unknown",
+                cost_label="Unknown",
+                privacy_grade="Unknown",
+                integration="Web"
+            ),
+            visual_quality=VisualQuality.MID,
+            job_to_be_done=[data["category"]],
+            executive_summary=data["community_consensus"],
+            pros=data["pros"],
+            cons=data["cons"],
+            use_cases=[data["category"]]
+        )
+
+        audit_log = AuditLog(
+            tool_name=data["name"],
+            action="Vault Auditor AI Analysis",
+            reason=f"Triggered by {admin_email} via DuckDuckGo + Gemini",
+            new_trust_score=float(data["trust_score"])
+        )
+
+        vault.save_tool(
+            tool_name=data["name"],
+            analysis=analysis,
+            trust_score=float(data["trust_score"]),
+            gallery=[],
+            audit_log=audit_log,
+            embedding=None
+        )
+        
+        # Hide by default as requested
+        vault.toggle_tool_status(data["name"], False)
+
+        return {"status": "success", "message": f"Tool '{data['name']}' audited and saved as hidden.", "data": data}
+
+    except Exception as e:
+        print(f"[Auditor Error]: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/auditor/auto-scan", dependencies=[Depends(verify_admin_user)])
+async def bulk_vault_audit(request: BulkAuditRequest, admin_email: str = Depends(verify_admin_user)):
+    """
+    Runs the automated Vault Auditor on multiple URLs and saves them to the Vault as hidden.
+    """
+    results = []
+    # Note: In a production app this should be enqueued via Celery or BackgroundTasks
+    # For MVP we will await sequentially or use BackgroundTasks, but here we do it sequentially.
+    for url in request.urls:
+        try:
+             # Basic implementation calling the single logic
+             fake_req = AuditRequest(url=url)
+             await manual_vault_audit(fake_req, admin_email)
+             results.append({"url": url, "status": "success"})
+        except Exception as e:
+             results.append({"url": url, "status": "failed", "reason": str(e)})
+             
+    return {"status": "completed", "results": results}
 
 @app.delete("/admin/vault/tool/{name}", dependencies=[Depends(verify_admin_user)])
 async def delete_vault_tool(name: str, admin_email: str = Depends(verify_admin_user)):
