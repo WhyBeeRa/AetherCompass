@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import numpy as np
-import google.genai as genai
+import google.generativeai as genai
 from typing import List, Dict
 from pydantic import BaseModel
 

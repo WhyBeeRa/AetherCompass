@@ -659,10 +659,62 @@ async def submit_vote(vote: EloBattleVote, user_data: Dict = Depends(get_current
 def get_leaderboard():
     return vault.get_user_rankings(limit=20)
 
+async def background_audit_scouted_tool(url: str, description: str, submitter_email: str):
+    print(f"[Background] Starting AI Audit for scouted tool: {url}")
+    try:
+        response = await run_vault_audit(url)
+        if response.get("status") == "error":
+            print(f"[Background Auditor Error] {response.get('reason')}")
+            return
+            
+        data = response["audit_data"]
+        
+        analysis = LabAnalysis(
+            tool_name=data["name"],
+            metrics=ToolMetrics(
+                accuracy=4, speed=4, value=4, ease_of_use=4,
+                pricing=data.get("pricing_model", "Unknown"),
+                learning_curve="בינוני",
+                latency_label="Unknown",
+                cost_label="Unknown",
+                privacy_grade="Unknown",
+                integration="Web"
+            ),
+            visual_quality=VisualQuality.MID,
+            job_to_be_done=[data.get("category", "General")],
+            executive_summary=description or data.get("community_consensus", ""),
+            pros=data.get("pros", []),
+            cons=data.get("cons", []),
+            use_cases=[data.get("category", "General")]
+        )
+
+        audit_log = AuditLog(
+            tool_name=data["name"],
+            action="Community Scout AI Analysis",
+            reason=f"Triggered by {submitter_email} via DuckDuckGo + Gemini",
+            new_trust_score=float(data.get("trust_score", 50))
+        )
+
+        vault.save_tool(
+            tool_name=data["name"],
+            analysis=analysis,
+            trust_score=float(data.get("trust_score", 50)),
+            gallery=[],
+            audit_log=audit_log,
+            embedding=None
+        )
+        
+        # Hide by default for admin review
+        vault.toggle_tool_status(data["name"], False)
+        print(f"[Background] Successfully scouted, audited, and hid {data['name']} for review.")
+    except Exception as e:
+        print(f"[Background Auditor Exception]: {e}")
+
+
 @app.post("/community/contribute")
-async def contribute_tool(contribution: ToolContribution, user_data: Dict = Depends(get_current_user)):
+async def contribute_tool(contribution: ToolContribution, background_tasks: BackgroundTasks, user_data: Dict = Depends(get_current_user)):
     """
-    User suggests a tool. Awards points and updates contributions count.
+    User suggests a tool. Awards points, updates contributions count, and runs AI Audit in background.
     """
     uid = user_data.get("uid")
     email = user_data.get("email")
@@ -678,8 +730,10 @@ async def contribute_tool(contribution: ToolContribution, user_data: Dict = Depe
         
     vault.update_user(profile)
     
-    # In a real app, we'd log this contribution for admin review
-    print(f"[Community] New tool Scouted by {email}: {contribution.name} ({contribution.url})")
+    # Run the Vault Auditor in the background
+    background_tasks.add_task(background_audit_scouted_tool, contribution.url, contribution.description, email)
+    
+    print(f"[Community] New tool Scouted by {email}: {contribution.name} ({contribution.url}). Audit queued.")
     
     return {"status": "success", "user": profile, "new_badges": new_badges}
 

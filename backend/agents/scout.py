@@ -4,7 +4,7 @@ import json
 from typing import List, Dict
 from datetime import datetime
 from models import ScoutFindings, VisualProof
-import google.genai as genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
