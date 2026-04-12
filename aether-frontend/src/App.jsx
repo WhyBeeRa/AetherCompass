@@ -1,8 +1,10 @@
-import { Suspense, lazy, useState } from "react";
-import { Routes, Route, Link, Navigate } from "react-router-dom";
+import { Suspense, lazy, useState, useEffect } from "react";
+import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { AlertCircle, Server, Shield, ShieldCheck, Settings as SettingsIcon, LogOut, User, BarChart3, PlusSquare, Scale, Zap, Activity, GitBranch, Coins } from "lucide-react";
 import SpaceBackground from "./components/SpaceBackground";
 import { useAuth } from "./AuthContext";
+import Lenis from 'lenis';
+import 'lenis/dist/lenis.css';
 
 // Lazy load all pages for Code Splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -34,7 +36,31 @@ const VendorInsights = lazy(() => import("./pages/VendorInsights"));
 function App() {
   const [appError, setAppError] = useState(null);
   const { currentUser, isAdmin, logout } = useAuth();
-  
+
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+      wheelMultiplier: 1,
+      touchMultiplier: 2,
+      infinite: false,
+    });
+
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
+  }, []);
+  const location = useLocation();
+  const isAboutPage = location.pathname === '/about';
+
   console.log("Debug Auth:", { 
       email: currentUser?.email, 
       envEmails: import.meta.env.VITE_ADMIN_EMAILS, 
@@ -135,7 +161,7 @@ function App() {
       </header>
 
       {/* Main Container - The dynamic part */}
-      <main className="max-w-4xl mx-auto w-full px-4 flex flex-col items-center pt-8 pb-24 flex-1">
+      <main className={`w-full flex flex-col items-center flex-1 ${isAboutPage ? '' : 'max-w-4xl mx-auto px-4 pt-8 pb-24'}`}>
         <Suspense fallback={<div className="min-h-[50vh] w-full bg-[#040914]" />}>
           <Routes>
             <Route path="/" element={<Home setAppError={setAppError} />} />

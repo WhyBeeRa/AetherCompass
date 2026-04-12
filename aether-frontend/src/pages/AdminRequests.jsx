@@ -20,15 +20,25 @@ const AdminRequests = () => {
       const resPending = await apiFetch('/admin/pending', {
         headers: { 'Authorization': `Bearer ${idToken}` }
       });
-      const dataPending = await resPending.json();
-      setPendingTools(dataPending);
+      
+      if (resPending.ok) {
+        const dataPending = await resPending.json();
+        setPendingTools(Array.isArray(dataPending) ? dataPending : []);
+      } else {
+        console.error("Failed to fetch pending tools:", resPending.status);
+      }
 
       // Fetch Live Scans
       const resLive = await apiFetch('/admin/live-scans', {
         headers: { 'Authorization': `Bearer ${idToken}` }
       });
-      const dataLive = await resLive.json();
-      setLiveScans(dataLive);
+      
+      if (resLive.ok) {
+        const dataLive = await resLive.json();
+        setLiveScans(Array.isArray(dataLive) ? dataLive : []);
+      } else {
+        console.error("Failed to fetch live scans:", resLive.status);
+      }
 
     } catch (error) {
       console.error("Error fetching admin data:", error);
@@ -43,6 +53,8 @@ const AdminRequests = () => {
       // Poll live scans every 5 seconds
       const interval = setInterval(fetchAll, 5000);
       return () => clearInterval(interval);
+    } else if (currentUser && !isAdmin) {
+        setLoading(false);
     }
   }, [currentUser, isAdmin]);
 
@@ -123,7 +135,7 @@ const AdminRequests = () => {
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-xl font-bold text-white uppercase tracking-wider">{tool.tool_name}</h3>
                       <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 text-xs rounded-full border border-cyan-500/20">
-                        {tool.analysis?.metrics?.trust_score}/100 Trust
+                        {tool.trust_score}/100 Trust
                       </span>
                     </div>
                     

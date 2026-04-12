@@ -10,20 +10,21 @@ with open("startup.log", "w") as f:
         f.write(".env file NOT FOUND\n")
 load_dotenv(dotenv_path=env_path)
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Header
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List, Optional
-import uuid
-
 import json
 import os
+import uuid
+import asyncio
+import traceback
+from datetime import datetime
 from pathlib import Path
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, List, Optional
+from firebase_admin import auth as firebase_auth
 from pipeline import AetherPipeline
 from models import GalleryItem, LabAnalysis, TrustScore, ToolMetrics, VisualQuality, AuditLog, ManualToolEntry
 from auth import verify_admin_user, initialize_firebase_admin
 initialize_firebase_admin()
-from fastapi import Request, Depends
-from firebase_admin import auth as firebase_auth
 from community_logic import calculate_elo_change, check_for_badges
 from models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
 from pydantic import BaseModel
@@ -806,12 +807,11 @@ def get_live_benchmarks():
     """
     return vault.get_latest_benchmarks()
 
-@app.post("/admin/benchmarks/trigger", dependencies=[Depends(verify_admin_user)])
-async def trigger_live_benchmark(background_tasks: BackgroundTasks, admin_email: str = Depends(verify_admin_user)):
+@app.post("/benchmarks/trigger")
+async def trigger_live_benchmark(background_tasks: BackgroundTasks):
     """
-    Manually triggers a live benchmark cycle.
+    Manually triggers a live benchmark cycle. Available to all users.
     """
-    print(f"[Admin] Live benchmark cycle triggered by {admin_email}")
     from live_benchmarking import LiveMonitor
     monitor = LiveMonitor(vault)
     background_tasks.add_task(monitor.run_benchmark_cycle)
@@ -844,6 +844,83 @@ async def trigger_autonomous_discovery(background_tasks: BackgroundTasks, admin_
 
     background_tasks.add_task(discovery_task)
     return {"status": "success", "message": "Autonomous scouting cycle triggered in background."}
+
+# --- Phase 9: Gemma Local Worker Batch Upload ---
+
+GEMMA_BATCHES_FILE = Path(__file__).parent / "gemma_batches.json"
+GEMMA_WORKER_KEY = os.getenv("GEMMA_WORKER_KEY", "")
+
+class GemmaBatchUpload(BaseModel):
+    batch_id: str
+    processed_at: str
+    model_used: str
+    mode: str
+    stats: Dict
+    verified_items: List[Dict]
+    rejected_items: List[Dict]
+
+def _verify_worker_key(authorization: str = Header(None)) -> str:
+    """
+    Accepts either:
+      - Bearer <firebase_token> (admin browser)
+      - X-Worker-Key <api_key>  (local worker script)
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization")
+
+    # Option 1: API Key from local worker
+    if authorization.startswith("X-Worker-Key "):
+        key = authorization.split(" ", 1)[1]
+        if not GEMMA_WORKER_KEY or key != GEMMA_WORKER_KEY:
+            raise HTTPException(status_code=403, detail="Invalid Worker Key")
+        return "local-worker"
+
+    # Option 2: Firebase Bearer token (admin dashboard)
+    if authorization.startswith("Bearer "):
+        return verify_admin_user(authorization)
+
+    raise HTTPException(status_code=401, detail="Invalid Authorization format")
+
+def _load_gemma_batches() -> List[Dict]:
+    if GEMMA_BATCHES_FILE.exists():
+        with open(GEMMA_BATCHES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def _save_gemma_batches(batches: List[Dict]):
+    with open(GEMMA_BATCHES_FILE, "w", encoding="utf-8") as f:
+        json.dump(batches, f, ensure_ascii=False, indent=2)
+
+@app.post("/admin/gemma/upload-batch")
+async def upload_gemma_batch(batch: GemmaBatchUpload, identity: str = Depends(_verify_worker_key)):
+    """
+    Receives a pre-processed batch from the local Gemma worker and stores it.
+    Accepts API key auth (local worker) or Firebase token (admin browser).
+    """
+    print(f"[Gemma] Batch '{batch.batch_id}' uploaded by {identity}. Items: {batch.stats}")
+
+    batch_record = batch.dict()
+    batch_record["uploaded_by"] = identity
+    batch_record["uploaded_at"] = datetime.now().isoformat()
+
+    batches = _load_gemma_batches()
+    batches.insert(0, batch_record)  # newest first
+    # Keep only last 50 batches
+    batches = batches[:50]
+    _save_gemma_batches(batches)
+
+    return {
+        "status": "success",
+        "message": f"Batch '{batch.batch_id}' stored. {batch.stats.get('passed_noise_gate', 0)} items verified, {batch.stats.get('escalated_to_cloud', 0)} escalated.",
+        "batch_id": batch.batch_id
+    }
+
+@app.get("/admin/gemma/batches", dependencies=[Depends(verify_admin_user)])
+def get_gemma_batches(admin_email: str = Depends(verify_admin_user)):
+    """
+    Returns all stored Gemma batch results for the admin dashboard.
+    """
+    return _load_gemma_batches()
 
 if __name__ == "__main__":
     import uvicorn

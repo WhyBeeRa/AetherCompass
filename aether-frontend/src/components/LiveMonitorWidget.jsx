@@ -26,6 +26,33 @@ const LiveMonitorWidget = () => {
         return () => clearInterval(interval);
     }, []);
 
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanMessage, setScanMessage] = useState("");
+
+    const handleTriggerScan = async () => {
+        setIsScanning(true);
+        setScanMessage("מתחיל סריקה...");
+        try {
+            const res = await apiFetch('/benchmarks/trigger', {
+                method: 'POST'
+            });
+            if (res.ok) {
+                setScanMessage("סריקה הופעלה בהצלחה");
+                setTimeout(() => {
+                    setScanMessage("");
+                    setIsScanning(false);
+                }, 3000);
+            } else {
+                setScanMessage("שגיאה בהפעלת סריקה");
+                setTimeout(() => setIsScanning(false), 3000);
+            }
+        } catch (err) {
+            console.error("Scan trigger failed:", err);
+            setScanMessage("חיבור נכשל");
+            setTimeout(() => setIsScanning(false), 3000);
+        }
+    };
+
     if (isLoading || benchmarks.length === 0) return (
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[140px] mb-12">
             <div className="flex items-center gap-3 text-cyan-400/50 text-sm font-medium animate-pulse mb-2">
@@ -41,7 +68,7 @@ const LiveMonitorWidget = () => {
 
     return (
         <div className="mb-12">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-2">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
                         <Activity className="w-4 h-4 text-cyan-400" />
@@ -51,9 +78,30 @@ const LiveMonitorWidget = () => {
                         <p className="text-[10px] text-white/40 uppercase tracking-widest">ביצועים ב-10 הדקות האחרונות</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight">Active Pulse</span>
+
+                <div className="flex items-center gap-3">
+                    {scanMessage && (
+                        <span className="text-[10px] font-bold text-cyan-400 animate-pulse uppercase tracking-wider">
+                            {scanMessage}
+                        </span>
+                    )}
+                    <button 
+                        onClick={handleTriggerScan}
+                        disabled={isScanning}
+                        className={`group relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all overflow-hidden
+                            ${isScanning 
+                                ? 'bg-white/5 text-white/20 border border-white/10 cursor-not-allowed' 
+                                : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 hover:border-cyan-500/40 active:scale-95'
+                            }`}
+                    >
+                        <Zap className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+                        <span>{isScanning ? 'סורק...' : 'הפעל סריקה בלייב'}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full h-8">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight">Active Pulse</span>
+                    </div>
                 </div>
             </div>
 

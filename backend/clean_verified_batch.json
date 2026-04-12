@@ -1,0 +1,69 @@
+{
+  "batch_id": "local_20260412_142845",
+  "processed_at": "2026-04-12T11:28:45.445913+00:00",
+  "model_used": "gemma4:e4b",
+  "mode": "dry_run",
+  "stats": {
+    "total_raw": 3,
+    "passed_noise_gate": 2,
+    "rejected_noise_gate": 1,
+    "escalated_to_cloud": 1
+  },
+  "verified_items": [
+    {
+      "id": "raw_002",
+      "tool_name": "Midjourney",
+      "source": "Reddit - r/midjourney",
+      "text": "I've been using Midjourney v7 for client work for 3 months now. The photorealism is insane — I replaced 80% of my stock photo budget. Prompt adherence is way better than DALL-E. Only real downside is the $30/mo pro plan adds up if you're a freelancer. Rendering speed is about 15 seconds per image on fast mode.",
+      "url": "https://reddit.com/r/midjourney/comments/def456",
+      "scraped_at": "2026-04-11T11:00:00Z",
+      "noise_gate": {
+        "verdict": "pass",
+        "reason": "Dry-run heuristic filter"
+      },
+      "classification": {
+        "category": "Design & Images",
+        "tech_stack": "Unknown",
+        "confidence": 0.7
+      },
+      "sentiment": {
+        "sentiment": "Positive",
+        "confidence": 0.92,
+        "signal_phrases": [],
+        "summary": "Dry-run heuristic sentiment analysis",
+        "escalate_to_cloud": false
+      }
+    },
+    {
+      "id": "raw_003",
+      "tool_name": "Jasper AI",
+      "source": "Reddit - r/copywriting",
+      "text": "Tried Jasper for a week on the free trial. Some outputs were genuinely impressive for blog intros, but then it hallucinated statistics in a product description which almost went live. The templates are decent but I'm not sure if it's worth $49/mo when ChatGPT Plus is $20. Still undecided.",
+      "url": "https://reddit.com/r/copywriting/comments/ghi789",
+      "scraped_at": "2026-04-11T12:15:00Z",
+      "noise_gate": {
+        "verdict": "pass",
+        "reason": "Dry-run heuristic filter"
+      },
+      "classification": {
+        "category": "Text & Productivity",
+        "tech_stack": "Unknown",
+        "confidence": 0.7
+      },
+      "sentiment": {
+        "sentiment": "Neutral",
+        "confidence": 0.57,
+        "signal_phrases": [],
+        "summary": "Dry-run heuristic sentiment analysis",
+        "escalate_to_cloud": true
+      }
+    }
+  ],
+  "rejected_items": [
+    {
+      "id": "raw_001",
+      "tool_name": "CursorAI",
+      "reason": "Dry-run heuristic filter"
+    }
+  ]
+}
