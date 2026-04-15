@@ -11,6 +11,7 @@ firebase-admin
 beautifulsoup4
 duckduckgo-search
 google-genai
+google-generativeai
 onnxruntime
 tokenizers
 huggingface-hub

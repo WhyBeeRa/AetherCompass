@@ -4,7 +4,6 @@ import json
 import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 from models import LabAnalysis, ToolMetrics, VisualQuality, IntentMapping, AuditLog
 from persistence import AetherVault
