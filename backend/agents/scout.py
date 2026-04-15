@@ -4,11 +4,11 @@ import json
 from typing import List, Dict
 from datetime import datetime
 from models import ScoutFindings, VisualProof
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 SCOUT_SYSTEM_PROMPT = """
 Role: You are the Commander of the "Scout" Agent for Aether - the Single Source of Truth for the AI world. 
@@ -37,12 +37,12 @@ Ensure the image URL is a real unsplash URL or highly plausible placeholder if r
 """
 
 class ScoutAgent:
-    """
-    The Scout: Officer of Discovery.
-    Scans sources to find new AI tools, filtering out hype and focusing on evidence.
-    """
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"response_mime_type": "application/json"})
+        """
+        The Scout: Officer of Discovery.
+        Scans sources to find new AI tools, filtering out hype and focusing on evidence.
+        """
+        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
     def calculate_reliability(self, content: str, has_visuals: bool) -> float:
         return 90.0 # Handled by LLM now
@@ -51,12 +51,19 @@ class ScoutAgent:
         return False
 
     async def run_discovery_cycle(self, intent: str) -> List[ScoutFindings]:
-        print(f"Scout: Initiating Operation for intent '{intent}' using Gemini API...")
+        print(f"Scout: Initiating Operation for intent '{intent}' using New GenAI SDK...")
         
         prompt = f"{SCOUT_SYSTEM_PROMPT}\n\nUser Intent to scan for: {intent}"
         
         try:
-            response = await asyncio.to_thread(self.model.generate_content, prompt)
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
             data = json.loads(response.text)
             
             proofs = []
