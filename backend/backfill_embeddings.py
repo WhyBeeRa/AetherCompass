@@ -4,8 +4,8 @@ import json
 import asyncio
 from typing import List
 from dotenv import load_dotenv
-
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 load_dotenv()
 
@@ -14,7 +14,7 @@ if not api_key:
     print("Error: GEMINI_API_KEY not found in environment.")
     exit(1)
 
-genai.configure(api_key=api_key)
+client = genai.Client(api_key=api_key)
 
 DB_PATH = "vault.db"
 
@@ -24,12 +24,12 @@ def get_db_connection():
 def generate_embedding(text: str) -> List[float]:
     """Generate a vector embedding for the given text using Gemini."""
     try:
-        result = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=text,
-            task_type="retrieval_document"
+        result = client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT")
         )
-        return result['embedding']
+        return result.embeddings[0].values
     except Exception as e:
         print(f"Error generating embedding: {e}")
         return []

@@ -4,11 +4,11 @@ import json
 from datetime import datetime
 from typing import List, Dict
 from models import ScoutFindings, LabAnalysis, ToolMetrics, VisualQuality, IntentMapping
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 LAB_SYSTEM_PROMPT = """
 Role: You are the Senior Intelligence Analyst (The Classifier) for Aether. Your task is to transform raw technical data and social evidence into structured, intent-based insights.
@@ -48,12 +48,19 @@ class ClassifierAgent:
     Transforming raw evidence into The Truth.
     """
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"response_mime_type": "application/json"})
+        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
     async def _query_llm(self, prompt: str, findings: ScoutFindings) -> Dict:
         full_prompt = f"{prompt}\n\nScout Findings:\n{findings.model_dump_json()}"
         try:
-            response = await asyncio.to_thread(self.model.generate_content, full_prompt)
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model='gemini-2.5-flash',
+                contents=full_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
             data = json.loads(response.text)
             return data
         except Exception as e:
