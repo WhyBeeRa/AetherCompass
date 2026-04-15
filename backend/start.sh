@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start script for Render
-# If we're already in backend, don't try to cd.
-# uvicorn handles the port via --port $PORT
+# CRITICAL: --workers 1 to prevent FastEmbed model RAM duplication (~130MB per worker)
+# On Render free tier (512MB), multiple workers would cause OOM crash.
 
 PORT=${PORT:-8000}
-python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+python -m uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1

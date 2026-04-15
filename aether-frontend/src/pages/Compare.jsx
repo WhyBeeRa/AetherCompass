@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Plus, Zap, DollarSign, Share2, ShieldCheck, Scale, Image as ImageIcon, Code, AlignLeft, Info } from 'lucide-react';
+import { Search, X, Plus, Zap, DollarSign, Share2, ShieldCheck, Scale, Image as ImageIcon, Code, AlignLeft, Info, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '../api';
+import { useTranslation } from 'react-i18next';
 
 const Compare = ({ setAppError }) => {
+    const { t, i18n } = useTranslation();
     const [selectedTools, setSelectedTools] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [viewMode, setViewMode] = useState('specs'); // 'specs' or 'outputs'
+    const [viewMode, setViewMode] = useState('specs');
 
-    // Fetch tools for search
     useEffect(() => {
         const searchTools = async () => {
             if (!searchQuery.trim()) {
@@ -36,7 +37,7 @@ const Compare = ({ setAppError }) => {
 
     const addTool = (tool) => {
         if (selectedTools.length >= 3) {
-            if (setAppError) setAppError("ניתן להשוות עד 3 כלים בו-זמנית.");
+            if (setAppError) setAppError(t('compare.max_tools_error'));
             return;
         }
         if (selectedTools.find(t => t.tool_name === tool.tool_name)) {
@@ -63,16 +64,17 @@ const Compare = ({ setAppError }) => {
                         {formatter(tool.analysis?.metrics?.[key] || tool.analysis?.[key])}
                     </div>
                 ))}
-                {/* Fill empty slots */}
                 {[...Array(3 - selectedTools.length)].map((_, idx) => (
-                    <div key={idx + selectedTools.length} className="text-center text-white/10 italic text-xs">ממתין לבחירה...</div>
+                    <div key={idx + selectedTools.length} className="text-center text-white/10 italic text-xs">{t('compare.waiting')}</div>
                 ))}
             </div>
         );
     };
 
+    const dir = i18n.dir();
+
     return (
-        <div className="w-full max-w-6xl mx-auto px-4 py-12 animate-in fade-in slide-in-from-bottom-4 duration-700" dir="rtl">
+        <div className="w-full max-w-6xl mx-auto px-4 py-12 animate-in fade-in slide-in-from-bottom-4 duration-700" dir={dir}>
             {/* Header */}
             <div className="text-center mb-16">
                 <motion.div 
@@ -83,10 +85,10 @@ const Compare = ({ setAppError }) => {
                     <Scale className="w-8 h-8 text-indigo-400 group-hover:rotate-12 transition-transform" />
                 </motion.div>
                 <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter">
-                    מטריצת ההשוואה <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Comparison Matrix</span>
+                    {t('compare.title')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Comparison Matrix</span>
                 </h1>
                 <p className="text-white/50 text-lg max-w-2xl mx-auto leading-relaxed">
-                    קבלו החלטות מבוססות דאטה. השוו בין היכולות הטכניות, העלויות והביצועים של כלי ה-AI המובילים בשוק ראש בראש.
+                    {t('compare.subtitle')}
                 </p>
             </div>
 
@@ -101,7 +103,7 @@ const Compare = ({ setAppError }) => {
                     >
                         <button 
                             onClick={() => removeTool(tool.tool_name)}
-                            className="absolute top-4 left-4 p-2 bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 rounded-full transition-all"
+                            className={`absolute top-4 ${dir === 'rtl' ? 'left-4' : 'right-4'} p-2 bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 rounded-full transition-all`}
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -126,18 +128,18 @@ const Compare = ({ setAppError }) => {
                     <div className="relative group">
                         <div className="h-full min-h-[160px] bg-white/[0.02] border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-6 hover:bg-white/[0.04] hover:border-indigo-500/20 transition-all group-hover:cursor-text">
                             <div className="relative w-full">
-                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-hover:text-indigo-400 transition-colors" />
+                                <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-hover:text-indigo-400 transition-colors`} />
                                 <input 
                                     type="text"
-                                    placeholder="חפש כלי להשוואה..."
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pr-12 pl-4 text-white focus:outline-none focus:border-indigo-500/30 transition-all text-center"
+                                    placeholder={t('compare.search_placeholder')}
+                                    className={`w-full bg-white/5 border border-white/10 rounded-2xl py-4 ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} text-white focus:outline-none focus:border-indigo-500/30 transition-all text-center`}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
                             <div className="mt-4 flex items-center gap-2 text-white/30 text-xs">
                                 <Plus className="w-4 h-4" />
-                                <span>הוסף כלי ({3 - selectedTools.length} נותרו)</span>
+                                <span>{t('compare.add_tool')} ({t('compare.remaining', { count: 3 - selectedTools.length })})</span>
                             </div>
                         </div>
 
@@ -180,14 +182,14 @@ const Compare = ({ setAppError }) => {
                         className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'specs' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-white/40 hover:text-white'}`}
                     >
                         <Zap className="w-4 h-4" />
-                        נתונים טכניים (Specs)
+                        {t('compare.specs')}
                     </button>
                     <button 
                         onClick={() => setViewMode('outputs')}
                         className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'outputs' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-white/40 hover:text-white'}`}
                     >
                         <ImageIcon className="w-4 h-4" />
-                        השוואת פלטים (Side-by-Side)
+                        {t('compare.outputs')}
                     </button>
                 </div>
             </div>
@@ -199,8 +201,8 @@ const Compare = ({ setAppError }) => {
                         <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
                             <Info className="w-8 h-8 text-white/20" />
                         </div>
-                        <h3 className="text-xl font-bold text-white/60 mb-2">המטריצה ריקה</h3>
-                        <p className="text-white/30 max-w-xs leading-relaxed">בחר לפחות כלי אחד כדי להתחיל להשוות נתונים וביצועים.</p>
+                        <h3 className="text-xl font-bold text-white/60 mb-2">{t('compare.empty_title')}</h3>
+                        <p className="text-white/30 max-w-xs leading-relaxed">{t('compare.empty_desc')}</p>
                     </div>
                 ) : (
                     <>
@@ -208,7 +210,7 @@ const Compare = ({ setAppError }) => {
                             <div className="space-y-2">
                                 {/* Header Row */}
                                 <div className="grid grid-cols-[1fr_repeat(3,1fr)] gap-4 pb-8 mb-4 border-b border-white/10 items-end">
-                                    <div className="text-xs text-white/30 font-bold uppercase tracking-widest pb-1">פרמטרים</div>
+                                    <div className="text-xs text-white/30 font-bold uppercase tracking-widest pb-1">{t('compare.params')}</div>
                                     {selectedTools.map((tool, idx) => (
                                         <div key={idx} className="text-center">
                                             <div className="text-xs font-black text-indigo-400 uppercase tracking-tighter mb-1">Tool 0{idx+1}</div>
@@ -224,17 +226,17 @@ const Compare = ({ setAppError }) => {
                                 </div>
 
                                 {/* Dynamic Rows */}
-                                {renderSpecRow("Latency (זמן תגובה)", <Clock className="w-4 h-4" />, "latency_label", (v) => v || '2.4s')}
-                                {renderSpecRow("מחיר למשימה (Est.)", <DollarSign className="w-4 h-4" />, "cost_label", (v) => v || '$0.01 / task')}
-                                {renderSpecRow("אינטגרציות", <Share2 className="w-4 h-4" />, "integration", (v) => v || 'Web / API')}
-                                {renderSpecRow("דרגת פרטיות", <ShieldCheck className="w-4 h-4" />, "privacy_grade", (v) => v || 'Enterprise Safe')}
-                                {renderSpecRow("עקומת למידה", <AlignLeft className="w-4 h-4" />, "learning_curve")}
-                                {renderSpecRow("רמת דיוק", <Zap className="w-4 h-4" />, "accuracy", (v) => `${v}/5`)}
+                                {renderSpecRow(t('compare.latency'), <Clock className="w-4 h-4" />, "latency_label", (v) => v || '2.4s')}
+                                {renderSpecRow(t('compare.price_per_task'), <DollarSign className="w-4 h-4" />, "cost_label", (v) => v || '$0.01 / task')}
+                                {renderSpecRow(t('compare.integrations'), <Share2 className="w-4 h-4" />, "integration", (v) => v || 'Web / API')}
+                                {renderSpecRow(t('compare.privacy_grade'), <ShieldCheck className="w-4 h-4" />, "privacy_grade", (v) => v || 'Enterprise Safe')}
+                                {renderSpecRow(t('learning_curve'), <AlignLeft className="w-4 h-4" />, "learning_curve")}
+                                {renderSpecRow(t('compare.accuracy'), <Zap className="w-4 h-4" />, "accuracy", (v) => `${v}/5`)}
                                 
                                 <div className="mt-12 p-6 bg-white/5 rounded-3xl border border-white/10">
                                     <h4 className="flex items-center gap-2 text-white font-bold mb-4">
                                         <Zap className="w-4 h-4 text-amber-400" />
-                                        ניתוח המומחים (System Insight)
+                                        {t('compare.expert_insight')}
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                         {selectedTools.map((tool, idx) => (

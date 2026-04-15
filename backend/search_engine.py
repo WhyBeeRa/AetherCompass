@@ -1,162 +1,130 @@
-import os
-import json
-import asyncio
+"""
+AetherSearchEngine — Zero-API Local Semantic Search
+=====================================================
+Pure local cosine similarity search using FastEmbed vectors.
+NO Gemini API calls. NO external network requests during search.
+
+Flow:
+  1. Receive query → embed locally (~5ms)
+  2. Load all tool vectors from SQLite
+  3. Cosine similarity + Trust Score weighting
+  4. Return top 5 results with match_reason from stored data
+"""
 import numpy as np
-from typing import List, Dict, Optional
-from pydantic import BaseModel, Field
-from google import genai
-from google.genai import types
+from typing import List, Dict
 
 from persistence import AetherVault
+from local_embedder import LocalEmbeddingEngine
 
-SEARCH_SYSTEM_PROMPT = """You are the Aether Semantic Search Engine, an AI expert in matching user needs to AI tools.
-Your job is to deeply understand a user's natural language query (intent) and match it against a provided list of AI tools.
-
-You will be given:
-1. A user query (the intent).
-2. A list of candidate tools with their name, summary, and specific 'jobs to be done'.
-
-Your mission:
-- Filter out tools that are NOT relevant to the query.
-- Rank the remaining tools by how well they solve the specific problem.
-- For each tool, provide a 'match_reason' in HEBREW (עברית) explaining exactly why it fits the user's need.
-- Assign a 'relevance_score' (0-100) reflecting the match quality.
-
-You must return a STRICT JSON object matching the provided schema.
-Rank results by relevance_score descending. Max 5 tools. If no tools match, return an empty array.
-"""
-
-class RankedTool(BaseModel):
-    tool_name: str = Field(description="The exact name of the tool provided in the candidates.")
-    match_reason: str = Field(description="A short 1-sentence explanation in HEBREW (עברית) of why this tool matches.")
-    relevance_score: int = Field(ge=0, le=100, description="Score defining how well the tool matches the intent.")
-
-class SearchEngineResponse(BaseModel):
-    results: List[RankedTool]
 
 class AetherSearchEngine:
-    def __init__(self):
-        # Build client using the new SDK
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.client = genai.Client(api_key=api_key) if api_key else None
-        self.model_id = "gemini-2.5-flash"
-        self.vault = AetherVault()
-
-    async def _get_embedding(self, text: str) -> List[float]:
-        """Fetch the embedding for a given text from Gemini."""
-        if not self.client:
-            return []
-        try:
-            # We must use the same model as the one used for indexing (gemini-embedding-001)
-            result = self.client.models.embed_content(
-                model="models/gemini-embedding-001",
-                contents=text,
-                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
-            )
-            return result.embeddings[0].values
-        except Exception as e:
-            print(f"[SearchEngine] Error generating embedding: {e}")
-            return []
+    def __init__(self, embedder: LocalEmbeddingEngine, vault: AetherVault):
+        self.embedder = embedder
+        self.vault = vault
 
     async def semantic_search(self, query: str) -> List[Dict]:
         """
-        AI-Powered Hybrid Search:
-        1. Fast Keyword/Vector candidate retrieval.
-        2. LLM-based Reranking and Reasoning.
+        Zero-API Semantic Search:
+        1. Embed query locally via FastEmbed (~5ms).
+        2. Cosine similarity against all stored tool vectors.
+        3. Weighted ranking: 0.7 * similarity + 0.3 * trust_score.
+        4. Return top 5 with match_reason from pre-stored analysis.
         """
-        # Fetch all tools from vault (29-31 tools is small enough to handle)
-        all_tools = self.vault.search_tools("", include_inactive=False)
+        # 1. EMBED QUERY LOCALLY
+        query_vector = self.embedder.embed(query)
+        q_norm = np.linalg.norm(query_vector)
+
+        if q_norm == 0:
+            return []
+
+        # 2. LOAD ALL TOOL VECTORS FROM DB
+        #    Returns: List[(tool_name, trust_score, vector, analysis_dict)]
+        all_tools = self.vault.get_all_embeddings()
+
         if not all_tools:
-            return []
+            # Fallback to keyword search if no embeddings exist yet
+            return self._keyword_fallback(query)
 
-        # 1. RETRIEVE CANDIDATES (Vector Search)
-        query_embedding = await self._get_embedding(query)
-        candidates = []
+        # 3. COSINE SIMILARITY + TRUST SCORE WEIGHTING
+        scored = []
+        for tool_name, trust_score, tool_vector, analysis in all_tools:
+            t_norm = np.linalg.norm(tool_vector)
+            if t_norm == 0:
+                continue
 
-        if query_embedding:
-            q_vec = np.array(query_embedding)
-            q_norm = np.linalg.norm(q_vec)
-            
-            for t in all_tools:
-                emb = t.get("embedding")
-                if emb:
-                    # Handle potential size mismatch if model changed
-                    t_vec = np.array(emb)
-                    if t_vec.shape == q_vec.shape:
-                        t_norm = np.linalg.norm(t_vec)
-                        if q_norm > 0 and t_norm > 0:
-                            sim = np.dot(q_vec, t_vec) / (q_norm * t_norm)
-                            candidates.append((sim, t))
-        
-        # Sort by similarity and pick top 15
-        candidates.sort(key=lambda x: x[0], reverse=True)
-        top_candidates = [c[1] for c in candidates[:15]]
-        
-        # If no vector match, try keyword search as fallback for candidates
-        if not top_candidates:
-             top_candidates = self.vault.search_tools(query)[:10]
+            # Cosine similarity: dot(q, t) / (||q|| * ||t||)
+            similarity = float(np.dot(query_vector, tool_vector) / (q_norm * t_norm))
 
-        if not top_candidates:
-            return []
+            # Weighted score: 70% semantic match + 30% trust
+            # trust_score is 0-100, normalize to 0-1
+            combined_score = 0.7 * similarity + 0.3 * (trust_score / 100.0)
 
-        # 2. RERANK & EXPLAIN (The Gemini Step)
-        if not self.client:
-            # Fallback if no API key
-            return top_candidates[:5]
+            scored.append((combined_score, similarity, tool_name, trust_score, analysis))
 
-        # Prepare tools context for the LLM
-        tools_context = []
-        for t in top_candidates:
-            analysis = t.get("analysis", {})
-            tools_context.append({
-                "name": t["tool_name"],
-                "summary": analysis.get("executive_summary", ""),
-                "jobs": analysis.get("job_to_be_done", [])
+        # 4. SORT & TOP 5
+        scored.sort(key=lambda x: x[0], reverse=True)
+        top_results = scored[:5]
+
+        # 5. FORMAT RESPONSE (same API contract as before)
+        formatted = []
+        for combined, sim, tool_name, trust_score, analysis in top_results:
+            # Only return tools with meaningful similarity (filter noise)
+            if sim < 0.20:
+                continue
+
+            slug_id = tool_name.strip().lower().replace(' ', '-')
+
+            # Build match_reason from pre-stored data (no LLM needed)
+            summary = analysis.get("executive_summary", "")
+            jobs = analysis.get("job_to_be_done", [])
+            match_reason = summary if summary else (", ".join(jobs) if jobs else "התאמה סמנטית")
+
+            # Primary intent from first job_to_be_done
+            primary_intent = jobs[0] if jobs else "כלי AI"
+
+            formatted.append({
+                "id": slug_id,
+                "tool_name": tool_name,
+                "title": tool_name.title(),
+                "trust_score": trust_score,
+                "analysis": analysis,
+                "match_reason": match_reason,
+                "primary_intent": primary_intent,
+                "relevance_score": int(combined * 100),
+                "similarity": round(sim, 4),
+                "metrics": analysis.get("metrics", {}),
+                "summary": summary,
             })
 
-        rerank_prompt = f"""
-        USER INTENT: "{query}"
-        
-        CANDIDATE TOOLS:
-        {json.dumps(tools_context, ensure_ascii=False)}
-        
-        Pick the most relevant tools (max 5) and explain why in Hebrew.
+        return formatted
+
+    def _keyword_fallback(self, query: str) -> List[Dict]:
         """
+        Fallback when no embeddings exist.
+        Uses basic keyword search from the vault.
+        """
+        results = self.vault.search_tools(query, include_inactive=False)
+        fallback = []
+        for r in results[:5]:
+            analysis = r.get("analysis", {})
+            summary = analysis.get("executive_summary", "")
+            if not summary and not analysis.get("job_to_be_done"):
+                continue
+            if "Seeded from Data Ingestion" in summary:
+                continue
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_id,
-                contents=rerank_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=SEARCH_SYSTEM_PROMPT,
-                    temperature=0.0,
-                    response_mime_type="application/json",
-                    response_schema=SearchEngineResponse
-                )
-            )
-            
-            ai_results = response.parsed.results
-            
-            # 3. FINAL MERGE
-            final_formatted = []
-            # Create a lookup for data from the original tool objects
-            tool_lookup = {t["tool_name"].lower(): t for t in top_candidates}
-            
-            for res in ai_results:
-                original_tool = tool_lookup.get(res.tool_name.lower())
-                if original_tool:
-                    # Update with AI insights
-                    original_tool["match_reason"] = res.match_reason
-                    original_tool["relevance_score"] = res.relevance_score
-                    final_formatted.append(original_tool)
-            
-            return final_formatted
-
-        except Exception as e:
-            print(f"[SearchEngine] Gemini Reranking failed: {e}")
-            # Fallback to simple top 5 if LLM fails
-            for t in top_candidates[:5]:
-                t["match_reason"] = "התאמה נמצאה על בסיס חיפוש סמנטי (ללא הסבר מעמיק)"
-                t["relevance_score"] = 70
-            return top_candidates[:5]
-
+            jobs = analysis.get("job_to_be_done", [])
+            fallback.append({
+                "id": r.get("id", ""),
+                "tool_name": r["tool_name"],
+                "title": r["tool_name"].title(),
+                "trust_score": r.get("trust_score", 0),
+                "analysis": analysis,
+                "match_reason": summary or "התאמה נמצאה על בסיס חיפוש מילות מפתח",
+                "primary_intent": jobs[0] if jobs else "כלי AI",
+                "relevance_score": 60,
+                "similarity": 0.0,
+                "metrics": analysis.get("metrics", {}),
+                "summary": summary,
+            })
+        return fallback

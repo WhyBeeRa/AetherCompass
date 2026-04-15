@@ -2,17 +2,6 @@ import math
 from typing import List, Tuple
 from models import Badge, UserProfile
 
-def calculate_elo_change(winner_elo: float, loser_elo: float, k_factor: int = 32) -> Tuple[float, float]:
-    """
-    Standard Elo rating calculation.
-    """
-    expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
-    expected_loser = 1 / (1 + 10 ** ((winner_elo - loser_elo) / 400))
-    
-    new_winner_elo = winner_elo + k_factor * (1 - expected_winner)
-    new_loser_elo = loser_elo + k_factor * (0 - expected_loser)
-    
-    return new_winner_elo, new_loser_elo
 
 def check_for_badges(user: UserProfile) -> List[Badge]:
     """

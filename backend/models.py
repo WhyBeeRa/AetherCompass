@@ -272,26 +272,9 @@ class UserProfile(BaseModel):
     last_active: datetime = Field(default_factory=datetime.now)
     is_pro: bool = False
 
-class EloBattleVote(BaseModel):
-    tool_a: str
-    tool_b: str
-    winner: str # tool_name or "draw"
-    category: Optional[str] = "General"
-    reason: Optional[str] = Field(None, description="Why the winner was chosen")
-
-class SearchAnalytics(BaseModel):
-    query: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-    results_found: int
-    user_id: Optional[str] = None
-
 class VendorInsights(BaseModel):
     tool_name: str
-    total_battles: int
-    win_rate: float
-    loss_reasons: List[Dict[str, Any]]
     missed_searches: List[Dict[str, Any]]
-    competitor_comparison: List[Dict[str, Any]]
 
 class ToolContribution(BaseModel):
     name: str

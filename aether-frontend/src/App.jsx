@@ -5,6 +5,7 @@ import SpaceBackground from "./components/SpaceBackground";
 import { useAuth } from "./AuthContext";
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
+import { useTranslation } from 'react-i18next';
 
 // Lazy load all pages for Code Splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -29,13 +30,14 @@ const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminVault = lazy(() => import("./pages/AdminVault"));
 const AdminRequests = lazy(() => import("./pages/AdminRequests"));
 const AetherInsiders = lazy(() => import("./pages/AetherInsiders"));
-const EloBattle = lazy(() => import("./pages/EloBattle"));
+
 const Compare = lazy(() => import("./pages/Compare"));
 const VendorInsights = lazy(() => import("./pages/VendorInsights"));
 
 function App() {
   const [appError, setAppError] = useState(null);
   const { currentUser, isAdmin, logout } = useAuth();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -67,8 +69,10 @@ function App() {
       isAdmin 
   });
 
+  const dir = i18n.dir();
+
   return (
-    <div className="min-h-screen font-sans antialiased flex flex-col w-full relative text-slate-200" dir="rtl">
+    <div className="min-h-screen font-sans antialiased flex flex-col w-full relative text-slate-200" dir={dir}>
       <SpaceBackground />
 
       {/* 1. Enterprise Header - PERSISTENT OUTSIDE ROUTES */}
@@ -88,19 +92,19 @@ function App() {
           </Link>
         </div>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/50">
-          <Link to="/#how-it-works" className="hover:text-cyan-300 transition-colors">איך זה עובד</Link>
-          <Link to="/use-cases" className="hover:text-cyan-300 transition-colors">תרחישים</Link>
+          <Link to="/#how-it-works" className="hover:text-cyan-300 transition-colors">{t('nav.how_it_works')}</Link>
+          <Link to="/use-cases" className="hover:text-cyan-300 transition-colors">{t('nav.use_cases')}</Link>
           <Link to="/vault" className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors">
             <Server className="w-3.5 h-3.5" />
-            הכספת
+            {t('nav.vault')}
           </Link>
           <Link to="/insiders" className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors">
             <User className="w-3.5 h-3.5" />
-            הקהילה
+            {t('nav.community')}
           </Link>
           <Link to="/compare" className="flex items-center gap-1.5 hover:text-indigo-400 transition-colors text-indigo-300/80">
             <Scale className="w-3.5 h-3.5" />
-            השוואה
+            {t('nav.compare')}
           </Link>
 
           {isAdmin && (
@@ -122,9 +126,9 @@ function App() {
         </nav>
         <div className="flex items-center gap-4">
           {currentUser ? (
-            <div className="flex items-center gap-4" dir="rtl">
+            <div className="flex items-center gap-4" dir={dir}>
               <div className="flex flex-col items-start leading-tight">
-                <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold">שלום,</span>
+                <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{t('nav.hello')}</span>
                 <span className="text-sm font-bold text-white tracking-tight">
                   {currentUser.displayName || currentUser.email.split('@')[0]}
                 </span>
@@ -134,14 +138,14 @@ function App() {
                 <Link 
                   to="/settings" 
                   className="p-2 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-cyan-400 group"
-                  title="הגדרות חשבון"
+                  title={t('nav.settings_title')}
                 >
                   <SettingsIcon className="w-5 h-5 group-hover:rotate-45 transition-transform duration-300" />
                 </Link>
                 <button 
                   onClick={logout}
                   className="p-2 hover:bg-rose-500/10 rounded-lg transition-all text-white/60 hover:text-rose-400"
-                  title="התנתק"
+                  title={t('nav.logout')}
                 >
                   <LogOut className="w-5 h-5" />
                 </button>
@@ -150,10 +154,10 @@ function App() {
           ) : (
             <>
               <Link to="/activation" className="text-sm font-medium text-white/50 hover:text-slate-200 transition-colors hidden sm:block">
-                התחבר
+                {t('nav.login')}
               </Link>
               <Link to="/activation" className="px-4 py-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-sm font-medium rounded-lg hover:bg-cyan-500/20 hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all">
-                התחל בחינם
+                {t('nav.get_started')}
               </Link>
             </>
           )}
@@ -185,7 +189,7 @@ function App() {
             <Route path="/admin/analytics" element={<AdminAnalytics setAppError={setAppError} />} />
             <Route path="/admin/requests" element={<AdminRequests setAppError={setAppError} />} />
             <Route path="/insiders" element={<AetherInsiders setAppError={setAppError} />} />
-            <Route path="/insiders/battle" element={<EloBattle setAppError={setAppError} />} />
+
             <Route path="/compare" element={<Compare setAppError={setAppError} />} />
             <Route path="/vendor/insights" element={<VendorInsights />} />
 
@@ -196,34 +200,34 @@ function App() {
       </main>
 
       {/* 7. Minimalist Footer - PERSISTENT OUTSIDE ROUTES */}
-      <footer className="w-full border-t border-white/5 bg-[#040914] pt-16 pb-8 px-6 md:px-12 mt-auto" dir="rtl">
+      <footer className="w-full border-t border-white/5 bg-[#040914] pt-16 pb-8 px-6 md:px-12 mt-auto" dir={dir}>
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div>
-            <h4 className="font-semibold text-white mb-4 text-sm">מוצר</h4>
+            <h4 className="font-semibold text-white mb-4 text-sm">{t('footer.product')}</h4>
             <ul className="space-y-2 text-sm text-white/60">
-              <li><Link to="/use-cases" className="hover:text-cyan-400 transition-colors">אינדקס כלים</Link></li>
-              <li><Link to="/vault" className="hover:text-cyan-400 transition-colors">הכספת (Live Data)</Link></li>
-              <li><Link to="/insiders" className="hover:text-cyan-400 transition-colors font-bold text-cyan-400/80">Aether Insiders</Link></li>
-              <li><Link to="/upgrade" className="hover:text-cyan-400 transition-colors">Aether Pro</Link></li>
+              <li><Link to="/use-cases" className="hover:text-cyan-400 transition-colors">{t('footer.tool_index')}</Link></li>
+              <li><Link to="/vault" className="hover:text-cyan-400 transition-colors">{t('footer.vault_live')}</Link></li>
+              <li><Link to="/insiders" className="hover:text-cyan-400 transition-colors font-bold text-cyan-400/80">{t('footer.insiders')}</Link></li>
+              <li><Link to="/upgrade" className="hover:text-cyan-400 transition-colors">{t('footer.pro')}</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4 text-sm">חברה</h4>
+            <h4 className="font-semibold text-white mb-4 text-sm">{t('footer.company')}</h4>
             <ul className="space-y-2 text-sm text-white/60">
-              <li><Link to="/about" className="hover:text-cyan-400 transition-colors">אודות</Link></li>
-              <li><Link to="/blog" className="hover:text-cyan-400 transition-colors">בלוג</Link></li>
-              <li><Link to="/contact" className="hover:text-cyan-400 transition-colors">צור קשר</Link></li>
+              <li><Link to="/about" className="hover:text-cyan-400 transition-colors">{t('footer.about')}</Link></li>
+              <li><Link to="/blog" className="hover:text-cyan-400 transition-colors">{t('footer.blog')}</Link></li>
+              <li><Link to="/contact" className="hover:text-cyan-400 transition-colors">{t('footer.contact')}</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4 text-sm">חוקי</h4>
+            <h4 className="font-semibold text-white mb-4 text-sm">{t('footer.legal')}</h4>
             <ul className="space-y-2 text-sm text-white/60">
-              <li><Link to="/terms" className="hover:text-cyan-400 transition-colors">תנאי שימוש</Link></li>
-              <li><Link to="/privacy" className="hover:text-cyan-400 transition-colors">פרטיות</Link></li>
+              <li><Link to="/terms" className="hover:text-cyan-400 transition-colors">{t('footer.terms')}</Link></li>
+              <li><Link to="/privacy" className="hover:text-cyan-400 transition-colors">{t('footer.privacy')}</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4 text-sm">רשתות</h4>
+            <h4 className="font-semibold text-white mb-4 text-sm">{t('footer.social')}</h4>
             <ul className="space-y-2 text-sm text-white/60">
               <li><a href="#" className="hover:text-cyan-400 transition-colors">Twitter (X)</a></li>
               <li><a href="#" className="hover:text-cyan-400 transition-colors">LinkedIn</a></li>
@@ -232,7 +236,7 @@ function App() {
           </div>
         </div>
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between pt-8 border-t border-white/5 text-xs text-white/70">
-          <span>© 2026 Aether AI. כל הזכויות שמורות.</span>
+          <span>{t('footer.rights')}</span>
           <div className="flex items-center gap-3 mt-4 md:mt-0 opacity-80 hover:opacity-100 transition-all duration-300" dir="ltr">
             <div className="flex flex-col items-center justify-center gap-2">
               <span className="text-lg font-bold tracking-tight text-white/80">Aether <span className="text-cyan-500">Compass</span></span>

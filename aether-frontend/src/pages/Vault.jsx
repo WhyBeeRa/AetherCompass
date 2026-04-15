@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import LiveMonitorWidget from '../components/LiveMonitorWidget';
 import { apiFetch } from '../api';
+import { useTranslation } from 'react-i18next';
 
 // Search Analytics Logger Component
 const SearchLogger = ({ query }) => {
@@ -11,10 +12,9 @@ const SearchLogger = ({ query }) => {
         if (!query || query.trim().length < 2) return;
         
         const timeoutId = setTimeout(() => {
-            // Signal the backend to log this search (runs in background)
             apiFetch(`/vault/search?q=${encodeURIComponent(query)}`)
                 .catch(err => console.warn("Analytics log failed", err));
-        }, 1500); // 1.5s debounce
+        }, 1500);
 
         return () => clearTimeout(timeoutId);
     }, [query]);
@@ -25,8 +25,8 @@ const SearchLogger = ({ query }) => {
 const Vault = ({ setAppError }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { t, i18n } = useTranslation();
 
-    // Parse URL params
     const queryParams = new URLSearchParams(location.search);
     const initialQuery = queryParams.get("q") || "";
 
@@ -37,7 +37,7 @@ const Vault = ({ setAppError }) => {
     const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [editingPricing, setEditingPricing] = useState(null); // { name, currentPricing }
+    const [editingPricing, setEditingPricing] = useState(null);
     const [newPricingValue, setNewPricingValue] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
 
@@ -45,29 +45,25 @@ const Vault = ({ setAppError }) => {
         const fetchVaultData = async () => {
             try {
                 setIsLoading(true);
-                // Fetch stats
                 const statsRes = await apiFetch('/vault/stats');
                 if (!statsRes.ok) throw new Error("Failed to fetch vault stats");
                 const statsData = await statsRes.json();
                 setStats(statsData);
 
-                // Fetch all tools (admins should see inactive ones too eventually, but search_tools filters by default)
-                // For now, let's keep it simple. Admins see everything if we pass a flag? 
-                // Let's stick to public for now, or update API if needed.
                 const toolsRes = await apiFetch('/vault/search?q=');
                 if (!toolsRes.ok) throw new Error("Failed to fetch vault data");
                 const toolsData = await toolsRes.json();
                 setTools(toolsData);
             } catch (err) {
                 console.error("Vault fetch error:", err);
-                if (setAppError) setAppError("שגיאה בטעינת נתוני הכספת.");
+                if (setAppError) setAppError(t('vault.error_load'));
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchVaultData();
-    }, [setAppError]);
+    }, [setAppError, t]);
 
     const handleToggleStatus = async (toolName, currentStatus) => {
         try {
@@ -81,7 +77,7 @@ const Vault = ({ setAppError }) => {
             
             setTools(prev => prev.map(t => t.tool_name === toolName ? { ...t, is_active: !currentStatus } : t));
         } catch (err) {
-            if (setAppError) setAppError("שגיאה בעדכון סטטוס הכלי.");
+            if (setAppError) setAppError(t('vault.error_toggle'));
         } finally {
             setIsUpdating(false);
         }
@@ -103,14 +99,14 @@ const Vault = ({ setAppError }) => {
             } : t));
             setEditingPricing(null);
         } catch (err) {
-            if (setAppError) setAppError("שגיאה בעדכון המחיר.");
+            if (setAppError) setAppError(t('vault.error_pricing'));
         } finally {
             setIsUpdating(false);
         }
     };
 
     const handleDelete = async (toolName) => {
-        if (!window.confirm(`האם אתה בטוח שברצונך למחוק את ${toolName} לצמיתות מהמאגר?`)) {
+        if (!window.confirm(t('vault.confirm_delete_tool', { name: toolName }))) {
             return;
         }
         
@@ -129,12 +125,11 @@ const Vault = ({ setAppError }) => {
                 throw new Error(errorData.detail || "Deletion failed");
             }
 
-            // Refresh tools
             setTools(prev => prev.filter(t => t.tool_name !== toolName));
             setConfirmDelete(null);
         } catch (err) {
             console.error("Delete error:", err);
-            if (setAppError) setAppError(err.message || "שגיאה במחיקת הכלי.");
+            if (setAppError) setAppError(err.message || t('vault.error_delete'));
         } finally {
             setIsDeleting(false);
         }
@@ -142,13 +137,21 @@ const Vault = ({ setAppError }) => {
 
     const categoryKeywords = {
         'פיתוח קוד': ['code', 'dev', 'react', 'tailwind', 'program', 'cursor', 'v0', 'github'],
+        'code development': ['code', 'dev', 'react', 'tailwind', 'program', 'cursor', 'v0', 'github'],
         'יצירת תמונות ועיצוב': ['image', 'design', 'midjourney', 'art', 'creative', 'ui', 'dall-e', 'luma'],
+        'image creation & design': ['image', 'design', 'midjourney', 'art', 'creative', 'ui', 'dall-e', 'luma'],
         'כתיבה וטקסט': ['text', 'write', 'content', 'chat', 'perplexity', 'claude', 'knowledge', 'gpt', 'model'],
+        'writing & text': ['text', 'write', 'content', 'chat', 'perplexity', 'claude', 'knowledge', 'gpt', 'model'],
         'עריכת וידאו': ['video', 'film', 'edit', 'heygen', 'runway'],
+        'video editing': ['video', 'film', 'edit', 'heygen', 'runway'],
         'דיבוב ושמע': ['audio', 'music', 'vocal', 'sound', 'suno', 'elevenlabs'],
+        'voiceover & audio': ['audio', 'music', 'vocal', 'sound', 'suno', 'elevenlabs'],
         'שיווק ו-seo': ['marketing', 'seo', 'sales', 'brand', 'campaign'],
+        'marketing & seo': ['marketing', 'seo', 'sales', 'brand', 'campaign'],
         'מצגות משקיעים': ['present', 'gamma', 'slide', 'deck', 'pitch'],
-        'כלים ארגוניים': ['enterprise', 'automat', 'zapier', 'workflow', 'make', 'task', 'api']
+        'investor decks': ['present', 'gamma', 'slide', 'deck', 'pitch'],
+        'כלים ארגוניים': ['enterprise', 'automat', 'zapier', 'workflow', 'make', 'task', 'api'],
+        'enterprise tools': ['enterprise', 'automat', 'zapier', 'workflow', 'make', 'task', 'api'],
     };
 
     const filteredTools = tools.filter(tool => {
@@ -158,7 +161,6 @@ const Vault = ({ setAppError }) => {
         const keywords = categoryKeywords[qLower];
 
         if (keywords) {
-            // Category Match Heuristic
             const intents = tool.analysis?.intents_mapped || [];
             const jobs = tool.analysis?.job_to_be_done || [];
             const text_corpus = (
@@ -169,25 +171,26 @@ const Vault = ({ setAppError }) => {
             return keywords.some(k => text_corpus.includes(k));
         }
 
-        // Standard Text Match
         return tool.tool_name.toLowerCase().includes(qLower) ||
             tool.analysis?.intents_mapped?.some(intent => (intent.intent_description || "").toLowerCase().includes(qLower));
     });
+
+    const dir = i18n.dir();
 
     return (
         <div className="w-full flex justify-center pb-24 px-4 sm:px-6 lg:px-8 mt-12 animate-in fade-in duration-700">
             <div className="w-full max-w-5xl">
 
                 {/* Header Section */}
-                <div className="mb-12 text-center md:text-right">
+                <div className={`mb-12 text-center md:${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <div className="inline-flex items-center justify-center p-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/20 mb-6 drop-shadow-[0_0_15px_rgba(6,182,212,0.15)]">
                         <Server className="w-8 h-8 text-cyan-400" />
                     </div>
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
-                        הכספת <span className="text-transparent bg-clip-text bg-gradient-to-l from-cyan-400 to-blue-500 font-light mx-2">The Vault</span>
+                        {t('vault.title')} <span className="text-transparent bg-clip-text bg-gradient-to-l from-cyan-400 to-blue-500 font-light mx-2">The Vault</span>
                     </h1>
-                    <p className="text-lg text-white/60 max-w-2xl text-center md:text-right">
-                        מאגר הנתונים המלא של Aether. כאן נמצאת האמת הגולמית, לאחר סינון רעשי השיווק, מגובה בהוכחות ויזואליות ודירוג אמון קפדני. השקיפות בהתגלמותה.
+                    <p className={`text-lg text-white/60 max-w-2xl text-center md:${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {t('vault.subtitle')}
                     </p>
                 </div>
 
@@ -200,30 +203,30 @@ const Vault = ({ setAppError }) => {
                         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <Layers className="w-5 h-5 text-cyan-400 mb-4" />
                         <div className="text-3xl font-bold text-white mb-1">{stats?.verified_tools_count || 0}</div>
-                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium">כלים מאומתים</div>
+                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium">{t('vault.verified_tools')}</div>
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <Shield className="w-5 h-5 text-blue-400 mb-4" />
                         <div className="text-3xl font-bold text-white mb-1">{stats?.average_trust_score?.toFixed(1) || "0.0"}</div>
-                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium">ממוצע אמון</div>
+                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium">{t('vault.avg_trust')}</div>
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <CheckCircle className="w-5 h-5 text-indigo-400 mb-4" />
                         <div className="text-3xl font-bold text-white mb-1">{stats?.total_intents_mapped || 0}</div>
-                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium">כוונות שמופו</div>
+                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium">{t('vault.intents_mapped')}</div>
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <Clock className="w-5 h-5 text-emerald-400 mb-4" />
                         <div className="text-lg font-bold text-white mb-1 mt-2 tracking-wider">
-                            {stats?.last_scan_date ? new Date(stats.last_scan_date).toLocaleDateString('he-IL') : "N/A"}
+                            {stats?.last_scan_date ? new Date(stats.last_scan_date).toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US') : "N/A"}
                         </div>
-                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium mt-2">סריקה אחרונה</div>
+                        <div className="text-xs text-white/50 uppercase tracking-widest font-medium mt-2">{t('vault.last_scan')}</div>
                     </div>
                 </div>
 
@@ -235,13 +238,13 @@ const Vault = ({ setAppError }) => {
                             Live Database
                         </h2>
                         <div className="relative w-full md:w-64">
-                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                            <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-white/40`} />
                             <input
                                 type="text"
-                                placeholder="חיפוש בכספת..."
+                                placeholder={t('vault.search_placeholder')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pr-10 pl-4 text-sm focus:outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-all text-white placeholder-white/30"
+                                className={`w-full bg-white/5 border border-white/10 rounded-lg py-2 ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} text-sm focus:outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-all text-white placeholder-white/30`}
                             />
                         </div>
                     </div>
@@ -257,32 +260,32 @@ const Vault = ({ setAppError }) => {
                             </div>
                             <button 
                                 onClick={() => {
-                                    if(window.confirm("האם אתה בטוח שברצונך למחוק את כל הכלים המופיעים בתוצאות החיפוש? פעולה זו אינה ניתנת לביטול!")) {
+                                    if(window.confirm(t('vault.confirm_delete_all'))) {
                                         filteredTools.forEach(t => handleDelete(t.tool_name));
                                     }
                                 }}
                                 className="px-4 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-all"
                             >
-                                מחיקת כל התוצאות ({filteredTools.length})
+                                {t('vault.delete_selected', { count: filteredTools.length })}
                             </button>
                         </div>
                     )}
 
                     <div className="overflow-x-auto">
                         {isLoading ? (
-                            <div className="p-12 text-center text-white/50 animate-pulse text-sm">מוציא נתונים מהכספת...</div>
+                            <div className="p-12 text-center text-white/50 animate-pulse text-sm">{t('vault.loading')}</div>
                         ) : filteredTools.length === 0 ? (
-                            <div className="p-12 text-center text-white/50 text-sm">לא נמצאו נתונים תואמים.</div>
+                            <div className="p-12 text-center text-white/50 text-sm">{t('vault.no_results')}</div>
                         ) : (
-                            <table className="w-full text-right text-sm">
+                            <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 <thead>
                                     <tr className="bg-white/[0.02] border-b border-white/5 text-white/40 uppercase tracking-widest text-[0.65rem] font-medium">
-                                        {isAdmin && <th className="px-6 py-4 font-medium">ניהול</th>}
-                                        <th className="px-6 py-4 font-medium">שם הכלי</th>
-                                        <th className="px-6 py-4 font-medium">Trust Score</th>
-                                        <th className="px-6 py-4 font-medium hidden md:table-cell">כוונות מרכזיות</th>
-                                        <th className="px-6 py-4 font-medium hidden sm:table-cell">מודל תמחור</th>
-                                        <th className="px-6 py-4 font-medium lg:text-center">סטטוס אימות</th>
+                                        {isAdmin && <th className="px-6 py-4 font-medium">{t('vault.col_manage')}</th>}
+                                        <th className="px-6 py-4 font-medium">{t('vault.col_tool_name')}</th>
+                                        <th className="px-6 py-4 font-medium">{t('vault.col_trust_score')}</th>
+                                        <th className="px-6 py-4 font-medium hidden md:table-cell">{t('vault.col_intents')}</th>
+                                        <th className="px-6 py-4 font-medium hidden sm:table-cell">{t('vault.col_pricing')}</th>
+                                        <th className="px-6 py-4 font-medium lg:text-center">{t('vault.col_status')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -294,7 +297,7 @@ const Vault = ({ setAppError }) => {
                                                         <button 
                                                             onClick={() => handleToggleStatus(tool.tool_name, tool.is_active)}
                                                             className={`p-2 rounded-lg transition-all ${tool.is_active ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-red-400 hover:bg-red-400/10'}`}
-                                                            title={tool.is_active ? "הפוך ללא פעיל (Kill Switch)" : "הפוך לפעיל"}
+                                                            title={tool.is_active ? t('vault.toggle_active_title') : t('vault.toggle_inactive_title')}
                                                         >
                                                             {tool.is_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                                                         </button>
@@ -306,20 +309,20 @@ const Vault = ({ setAppError }) => {
                                                                     disabled={isDeleting}
                                                                     className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-all flex items-center gap-1"
                                                                 >
-                                                                    {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : "כן"}
+                                                                    {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : t('vault.yes')}
                                                                 </button>
                                                                 <button 
                                                                     onClick={() => setConfirmDelete(null)}
                                                                     className="text-white/40 hover:text-white transition-colors text-xs"
                                                                 >
-                                                                    לא
+                                                                    {t('vault.no')}
                                                                 </button>
                                                             </div>
                                                         ) : (
                                                             <button 
                                                                 onClick={() => setConfirmDelete(tool.tool_name)}
                                                                 className="p-2 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                                                                title="מחק מהכספת"
+                                                                title={t('vault.delete_title')}
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
@@ -397,7 +400,7 @@ const Vault = ({ setAppError }) => {
                                                                     setNewPricingValue(tool.analysis?.metrics?.pricing || "");
                                                                 }}
                                                                 className="opacity-0 group-hover:opacity-100 p-1 hover:text-cyan-400 transition-all"
-                                                                title="ערוך מודל תמחור"
+                                                                title={t('vault.edit_pricing_title')}
                                                             >
                                                                 <Edit2 className="w-3 h-3" />
                                                             </button>
@@ -413,7 +416,7 @@ const Vault = ({ setAppError }) => {
                                                         <AlertCircle className="w-4 h-4 text-red-400" />
                                                     )}
                                                     <span className="text-xs text-white/40">
-                                                        {new Date(tool.audit_log?.timestamp || Date.now()).toLocaleDateString('he-IL')}
+                                                        {new Date(tool.audit_log?.timestamp || Date.now()).toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US')}
                                                     </span>
                                                 </div>
                                             </td>

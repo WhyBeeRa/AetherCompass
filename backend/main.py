@@ -25,8 +25,8 @@ from pipeline import AetherPipeline
 from models import GalleryItem, LabAnalysis, TrustScore, ToolMetrics, VisualQuality, AuditLog, ManualToolEntry
 from auth import verify_admin_user, initialize_firebase_admin
 initialize_firebase_admin()
-from community_logic import calculate_elo_change, check_for_badges
-from models import UserProfile, EloBattleVote, Badge, ToolContribution, LiveMetric
+from community_logic import check_for_badges
+from models import UserProfile, Badge, ToolContribution, LiveMetric
 from pydantic import BaseModel
 from admin_auditor import run_lean_audit
 
@@ -80,9 +80,13 @@ pipeline = AetherPipeline()
 from persistence import AetherVault
 vault = AetherVault()
 
-# Initialize Semantic Search Engine
+# Initialize Local Embedding Engine (singleton — loads model once into ~130MB RAM)
+from local_embedder import LocalEmbeddingEngine
+embedder = LocalEmbeddingEngine.get_instance()
+
+# Initialize Zero-API Semantic Search Engine
 from search_engine import AetherSearchEngine
-search_engine = AetherSearchEngine()
+search_engine = AetherSearchEngine(embedder, vault)
 
 @app.on_event("startup")
 async def startup_event():
@@ -334,6 +338,11 @@ async def add_manual_tool(tool_data: ManualToolEntry, request: Request, admin_em
             new_trust_score=float(tool_data.trust_score)
         )
 
+        # Generate local embedding for search
+        search_text = f"{tool_data.name}. {tool_data.description}. " + \
+                      ", ".join(tool_data.use_cases + tool_data.pros)
+        embedding_bytes = embedder.embed_to_bytes(search_text)
+
         # Save to database
         vault.save_tool(
             tool_name=tool_data.name,
@@ -341,7 +350,7 @@ async def add_manual_tool(tool_data: ManualToolEntry, request: Request, admin_em
             trust_score=float(tool_data.trust_score),
             gallery=gallery,
             audit_log=audit_log,
-            embedding=None # We skip embedding for purely manual tools for now
+            embedding=embedding_bytes
         )
 
         return {"status": "success", "message": f"Tool '{tool_data.name}' added successfully."}
@@ -389,13 +398,17 @@ async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(v
             new_trust_score=float(data["trust_score"])
         )
 
+        # Generate local embedding for search
+        search_text = f"{data['name']}. {data.get('community_consensus', '')}. {data.get('category', '')}"
+        embedding_bytes = embedder.embed_to_bytes(search_text)
+
         vault.save_tool(
             tool_name=data["name"],
             analysis=analysis,
             trust_score=float(data["trust_score"]),
             gallery=[],
             audit_log=audit_log,
-            embedding=None,
+            embedding=embedding_bytes,
             is_active=0
         )
 
@@ -597,76 +610,15 @@ async def get_profile(user_data: Dict = Depends(get_current_user)):
     uid = user_data.get("uid")
     email = user_data.get("email")
     profile = vault.get_or_create_user(uid, email)
-    return profile
-
-@app.get("/community/battle/pair")
-def get_battle_pair(category: Optional[str] = None):
-    """
-    Returns two tools for an Elo battle.
-    """
-    pair = vault.get_random_tool_pair(category)
-    if len(pair) < 2:
-        # Fallback to any tools if category is empty
-        pair = vault.get_random_tool_pair(None)
-        
-    if len(pair) < 2:
-        raise HTTPException(status_code=404, detail="Not enough tools for a battle.")
-        
-    return pair
-
-@app.post("/community/battle/vote")
-async def submit_vote(vote: EloBattleVote, user_data: Dict = Depends(get_current_user)):
-    """
-    Records a vote and updates tool ELO scores.
-    """
-    uid = user_data.get("uid")
     
-    # 1. Record the vote
-    vault.record_vote(uid, vote.tool_a, vote.tool_b, vote.winner, vote.category, vote.reason)
-    
-    # 2. Update Tool ELO in Trust Score
-    tool_a_data = vault.get_tool(vote.tool_a)
-    tool_b_data = vault.get_tool(vote.tool_b)
-    
-    if tool_a_data and tool_b_data:
-        elo_a = tool_a_data["trust_score"]
-        elo_b = tool_b_data["trust_score"]
-        
-        if vote.winner == vote.tool_a:
-            new_a, new_b = calculate_elo_change(elo_a, elo_b)
-        elif vote.winner == vote.tool_b:
-            new_b, new_a = calculate_elo_change(elo_b, elo_a)
-        else: # Draw or other
-             # In a draw, we don't change or change slightly? Let's skip for now or use 0.5
-             return {"status": "success", "message": "Vote recorded (draw)"}
-
-        # Cap scores between 1-100
-        new_a = max(1.0, min(100.0, new_a))
-        new_b = max(1.0, min(100.0, new_b))
-        
-        vault.update_tool_trust_score(vote.tool_a, new_a, f"Elo Battle Win against {vote.tool_b}")
-        vault.update_tool_trust_score(vote.tool_b, new_b, f"Elo Battle Loss against {vote.tool_a}")
-
-    # 3. Update User Badges/Points
-    profile = vault.get_or_create_user(uid, user_data.get("email"))
-    profile.votes_count += 1
-    profile.points += 10
-    new_badges = check_for_badges(profile)
-    if new_badges:
-        profile.badges.extend(new_badges)
-    
-    vault.update_user(profile)
-    
-    return {"status": "success", "user": profile, "new_badges": new_badges}
-
 @app.get("/community/leaderboard")
 def get_leaderboard():
     return vault.get_user_rankings(limit=20)
 
-async def background_audit_scouted_tool(task_id: int, url: str, description: str, submitter_email: str):
+async def background_audit_scouted_tool(task_id: int, url: str, description: str, submitter_email: str, suggested_name: str = None):
     log_file = "background_tasks.log"
     with open(log_file, "a") as f:
-        f.write(f"\n[{datetime.now()}] STARTING AUDIT: {url} (requested by {submitter_email})\n")
+        f.write(f"\n[{datetime.now()}] STARTING AUDIT: {url} (suggested name: {suggested_name}, requested by {submitter_email})\n")
 
     try:
         # Update task status to scanning
@@ -686,12 +638,18 @@ async def background_audit_scouted_tool(task_id: int, url: str, description: str
             
         data = response["audit_data"]
         
+        # Use suggested name if AI failed to find a meaningful one or as a fallback
+        final_tool_name = data.get('name')
+        if not final_tool_name or "unnamed" in final_tool_name.lower() or "ai tool" in final_tool_name.lower():
+            if suggested_name:
+                final_tool_name = suggested_name
+        
         with open(log_file, "a") as f:
-            f.write(f"[{datetime.now()}] Step 2: Agent Scan Complete. Name: {data.get('name')}. Trust Score: {data.get('trust_score')}\n")
+            f.write(f"[{datetime.now()}] Step 2: Agent Scan Complete. Name: {final_tool_name} (AI target: {data.get('name')}). Trust Score: {data.get('trust_score')}\n")
 
         # Step 2: Construct LabAnalysis
         analysis = LabAnalysis(
-            tool_name=data["name"],
+            tool_name=final_tool_name,
             metrics=ToolMetrics(
                 accuracy=4, speed=4, value=4, ease_of_use=4,
                 pricing=data.get("pricing_model", "Unknown"),
@@ -711,31 +669,34 @@ async def background_audit_scouted_tool(task_id: int, url: str, description: str
         )
 
         audit_log = AuditLog(
-            tool_name=data["name"],
+            tool_name=final_tool_name,
             action="Community Scout AI Analysis",
             reason=f"Triggered by {submitter_email} via DuckDuckGo + Gemini",
             new_trust_score=float(data.get("trust_score", 50))
         )
 
-        # Step 3: Save to Vault (Inactive)
+        # Step 3: Generate local embedding and Save to Vault (Inactive)
         with open(log_file, "a") as f:
-            f.write(f"[{datetime.now()}] Step 3: Saving to Vault (is_active=0)...\n")
+            f.write(f"[{datetime.now()}] Step 3: Embedding + Saving to Vault (is_active=0)...\n")
+
+        search_text = f"{final_tool_name}. {data.get('community_consensus', '')}. {data.get('category', '')}"
+        embedding_bytes = embedder.embed_to_bytes(search_text)
 
         vault.save_tool(
-            tool_name=data["name"],
+            tool_name=final_tool_name,
             analysis=analysis,
             trust_score=float(data.get("trust_score", 50)),
             gallery=[],
             audit_log=audit_log,
-            embedding=None,
+            embedding=embedding_bytes,
             is_active=0
         )
         
-        # Update task to completed
-        vault.update_scout_task(task_id, "completed")
+        # Update task to completed and sync the name for the admin list
+        vault.update_scout_task(task_id, "completed", final_tool_name=final_tool_name)
         
         with open(log_file, "a") as f:
-            f.write(f"[{datetime.now()}] SUCCESS: Tool {data['name']} is now in the review queue.\n")
+            f.write(f"[{datetime.now()}] SUCCESS: Tool {final_tool_name} is now in the review queue.\n")
 
     except Exception as e:
         error_info = f"CRITICAL ERROR in background auditor: {str(e)}\n{traceback.format_exc()}"
@@ -768,7 +729,7 @@ async def contribute_tool(contribution: ToolContribution, background_tasks: Back
     task_id = vault.create_scout_task(contribution.name, contribution.url, email)
     
     # Run the Vault Auditor in the background
-    background_tasks.add_task(background_audit_scouted_tool, task_id, contribution.url, contribution.description, email)
+    background_tasks.add_task(background_audit_scouted_tool, task_id, contribution.url, contribution.description, email, suggested_name=contribution.name)
     
     print(f"[Community] New tool Scouted by {email}: {contribution.name} ({contribution.url}). Audit queued.")
     

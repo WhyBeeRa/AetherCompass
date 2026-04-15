@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Github, Compass } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function Activation() {
     const navigate = useNavigate();
     const { loginWithGoogle, currentUser } = useAuth();
+    const { t } = useTranslation();
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSent, setIsSent] = useState(false);
@@ -15,7 +17,6 @@ export default function Activation() {
         if (!email) return;
 
         setIsLoading(true);
-        // Simulate network request
         setTimeout(() => {
             setIsLoading(false);
             setIsSent(true);
@@ -27,14 +28,13 @@ export default function Activation() {
             await loginWithGoogle();
             navigate('/');
         } catch (error) {
-            alert("שגיאת התחברות מגוגל: " + error.message);
+            alert(t('activation.login_error') + error.message);
             console.error("Login failed:", error);
         }
     };
 
     useEffect(() => {
         if (currentUser) {
-            // Only navigate on mount if already logged in, not tracking state changes vigorously 
             navigate('/');
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,7 +50,7 @@ export default function Activation() {
                     className="flex items-center gap-2 text-white/60 hover:text-white transition-colors text-sm font-medium"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    חזרה הביתה
+                    {t('activation.back_home')}
                 </button>
             </div>
 
@@ -62,8 +62,8 @@ export default function Activation() {
                     <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 shadow-inner">
                         <Compass className="w-6 h-6 text-white" />
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">ברוכים הבאים ל-Aether</h1>
-                    <p className="text-white/60 text-sm text-center">היכנס או צור חשבון כדי לשמור כלים ולנהל את מחסנית הטכנולוגיה שלך.</p>
+                    <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">{t('activation.title')}</h1>
+                    <p className="text-white/60 text-sm text-center">{t('activation.subtitle')}</p>
                 </div>
 
                 {!isSent ? (
@@ -88,17 +88,17 @@ export default function Activation() {
                                     fill="#EA4335"
                                 />
                             </svg>
-                            המשך עם Google
+                            {t('activation.continue_google')}
                         </button>
 
                         <button className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/20 backdrop-blur-md border border-white/20 rounded-xl text-white font-medium hover:bg-white/10 backdrop-blur-md transition-all shadow-sm">
                             <Github className="w-5 h-5" />
-                            המשך עם GitHub
+                            {t('activation.continue_github')}
                         </button>
 
                         <div className="flex items-center gap-3 my-4">
                             <div className="h-px bg-white/20 backdrop-blur-md flex-1"></div>
-                            <span className="text-xs font-medium text-white/50 uppercase tracking-widest">או</span>
+                            <span className="text-xs font-medium text-white/50 uppercase tracking-widest">{t('activation.or')}</span>
                             <div className="h-px bg-white/20 backdrop-blur-md flex-1"></div>
                         </div>
 
@@ -126,10 +126,10 @@ export default function Activation() {
                                 {isLoading ? (
                                     <span className="flex items-center gap-2">
                                         <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-neutral-900 animate-spin"></div>
-                                        שולח...
+                                        {t('activation.sending')}
                                     </span>
                                 ) : (
-                                    'התחבר עם לינק קסם'
+                                    t('activation.magic_link_btn')
                                 )}
                             </button>
                         </form>
@@ -140,15 +140,15 @@ export default function Activation() {
                         <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
                             <Mail className="w-8 h-8 text-emerald-500" />
                         </div>
-                        <h2 className="text-xl font-bold text-white mb-2">בדוק את תיבת המייל שלך</h2>
+                        <h2 className="text-xl font-bold text-white mb-2">{t('activation.check_email')}</h2>
                         <p className="text-white/60 text-sm mb-8">
-                            שלחנו לינק התחברות קסום לכתובת <strong className="text-white" dir="ltr">{email}</strong>
+                            {t('activation.email_sent')} <strong className="text-white" dir="ltr">{email}</strong>
                         </p>
                         <button
                             onClick={() => setIsSent(false)}
                             className="text-sm font-medium text-white/60 hover:text-white transition-colors"
                         >
-                            לא קיבלת? נסה שוב
+                            {t('activation.resend')}
                         </button>
                     </div>
                 )}
@@ -156,7 +156,7 @@ export default function Activation() {
 
             {/* Footer Terms */}
             <p className="text-xs text-white/50 mt-8 text-center max-w-sm">
-                בהמשך התהליך, אתה מסכים ל<a href="/terms" className="underline hover:text-white/80">תנאי השימוש</a> ול<a href="/privacy" className="underline hover:text-white/80">מדיניות הפרטיות</a> שלנו.
+                {t('activation.terms_prefix')}<a href="/terms" className="underline hover:text-white/80">{t('activation.terms_link')}</a> {t('activation.and')}<a href="/privacy" className="underline hover:text-white/80">{t('activation.privacy_link')}</a>{i18n && i18n.language === 'he' ? ' שלנו.' : '.'}
             </p>
         </div>
     );

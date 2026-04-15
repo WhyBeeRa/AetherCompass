@@ -1,7 +1,8 @@
 import sqlite3
 import json
+import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Tuple
 from models import AuditLog, LabAnalysis, GalleryItem, TrustScore, UserProfile, Badge, LiveMetric
 
 from pathlib import Path
@@ -57,6 +58,12 @@ class AetherVault:
         # Apply schema migration if embedding_json is missing
         try:
              c.execute("ALTER TABLE verified_tools ADD COLUMN embedding_json TEXT")
+        except sqlite3.OperationalError:
+             pass # Column already exists
+
+        # Migration: Add embedding_blob column for FastEmbed binary vectors
+        try:
+             c.execute("ALTER TABLE verified_tools ADD COLUMN embedding_blob BLOB")
         except sqlite3.OperationalError:
              pass # Column already exists
 
@@ -138,10 +145,10 @@ class AetherVault:
         conn.commit()
         conn.close()
 
-    def save_tool(self, tool_name: str, analysis: LabAnalysis, trust_score: float, gallery: List[GalleryItem], audit_log: AuditLog, embedding: Optional[List[float]] = None, is_active: int = 1):
+    def save_tool(self, tool_name: str, analysis: LabAnalysis, trust_score: float, gallery: List[GalleryItem], audit_log: AuditLog, embedding: Optional[bytes] = None, is_active: int = 1):
         """
         Saves a fully verified tool to the Vault.
-
+        `embedding` should be raw bytes from numpy ndarray.tobytes() (float32, 384 dims).
         """
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -162,21 +169,21 @@ class AetherVault:
         else:
             gallery_json = json.dumps([item.dict() for item in gallery], default=str)
         
-        # Handle embeddings: keep old if new is not provided
-        embedding_json = None
+        # Handle binary embedding: keep old if new is not provided
+        embedding_blob = None
         if embedding is not None:
-             embedding_json = json.dumps(embedding)
+             embedding_blob = embedding  # Already raw bytes
         else:
-             c.execute("SELECT embedding_json FROM verified_tools WHERE tool_name = ?", (tool_name.lower(),))
+             c.execute("SELECT embedding_blob FROM verified_tools WHERE tool_name = ?", (tool_name.lower(),))
              row = c.fetchone()
              if row and row[0]:
-                  embedding_json = row[0]
+                  embedding_blob = row[0]
                   
         # Upsert into Verified Tools
         c.execute('''INSERT OR REPLACE INTO verified_tools 
-                     (tool_name, last_updated, trust_score, intent_category, analysis_json, gallery_json, embedding_json, is_active)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (tool_name.lower(), timestamp, trust_score, str(analysis.job_to_be_done), analysis_json, gallery_json, embedding_json, is_active))
+                     (tool_name, last_updated, trust_score, intent_category, analysis_json, gallery_json, embedding_json, embedding_blob, is_active)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                  (tool_name.lower(), timestamp, trust_score, str(analysis.job_to_be_done), analysis_json, gallery_json, None, embedding_blob, is_active))
         
         # Log Audit
         c.execute('''INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)
@@ -217,19 +224,52 @@ class AetherVault:
         conn.close()
         print(f"[Vault] Tool '{tool_name}' and all related data purged from the Vault.")
 
-    def update_tool_embedding(self, tool_name: str, embedding: List[float]):
+    def update_tool_embedding(self, tool_name: str, embedding_bytes: bytes):
         """
-        Updates only the embedding for a specific tool.
+        Updates only the binary embedding for a specific tool.
+        `embedding_bytes` should be raw bytes from numpy ndarray.tobytes().
         """
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
-        embedding_json = json.dumps(embedding)
-        c.execute("UPDATE verified_tools SET embedding_json = ? WHERE tool_name = ?", (embedding_json, tool_name.lower()))
+        c.execute("UPDATE verified_tools SET embedding_blob = ? WHERE tool_name = ?", (embedding_bytes, tool_name.lower()))
         
         conn.commit()
         conn.close()
-        print(f"[Vault] Embedded vector saved for '{tool_name}'.")
+        print(f"[Vault] Binary embedding saved for '{tool_name}'.")
+
+    def get_all_embeddings(self) -> List[Tuple[str, float, np.ndarray, dict]]:
+        """
+        Bulk-loads all active tool embeddings for the search engine.
+        Returns list of (tool_name, trust_score, embedding_vector, analysis_dict).
+        Reconstructs numpy arrays from binary BLOB using np.frombuffer.
+        """
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        c.execute("SELECT tool_name, trust_score, embedding_blob, analysis_json FROM verified_tools WHERE is_active = 1")
+        rows = c.fetchall()
+        conn.close()
+        
+        results = []
+        for row in rows:
+            blob = row['embedding_blob']
+            if not blob:
+                continue  # Skip tools without embeddings
+            
+            # CRITICAL: Reconstruct numpy array from raw bytes
+            vector = np.frombuffer(blob, dtype=np.float32)
+            analysis = json.loads(row['analysis_json']) if row['analysis_json'] else {}
+            
+            results.append((
+                row['tool_name'],
+                row['trust_score'],
+                vector,
+                analysis
+            ))
+        
+        return results
 
     def get_tool(self, tool_identifier: str, include_expired: bool = False) -> Optional[Dict]:
         """
@@ -240,19 +280,25 @@ class AetherVault:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
-        # Try exact match first
-        c.execute("SELECT * FROM verified_tools WHERE tool_name = ?", (tool_identifier.lower(),))
+        # Try exact match first (Explicit columns to avoid binary blob leakage)
+        c.execute("""SELECT tool_name, last_updated, trust_score, intent_category, 
+                            analysis_json, gallery_json, is_active 
+                     FROM verified_tools WHERE tool_name = ?""", (tool_identifier.lower(),))
         row = c.fetchone()
         
         # Try slug match if not found
         if not row:
-            c.execute("SELECT * FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = ?", (tool_identifier.lower(),))
+            c.execute("""SELECT tool_name, last_updated, trust_score, intent_category, 
+                                analysis_json, gallery_json, is_active 
+                         FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = ?""", (tool_identifier.lower(),))
             row = c.fetchone()
             
-        # Try a relaxed LIKE match if still not found (e.g. "claude" -> "claude 3")
+        # Try a relaxed LIKE match if still not found
         if not row:
             search_pattern = f"%{tool_identifier.lower()}%"
-            c.execute("SELECT * FROM verified_tools WHERE lower(tool_name) LIKE ? LIMIT 1", (search_pattern,))
+            c.execute("""SELECT tool_name, last_updated, trust_score, intent_category, 
+                                analysis_json, gallery_json, is_active 
+                         FROM verified_tools WHERE lower(tool_name) LIKE ? LIMIT 1""", (search_pattern,))
             row = c.fetchone()
             
         conn.close()
@@ -277,7 +323,6 @@ class AetherVault:
             "last_updated": row['last_updated'],
             "trust_score": row['trust_score'],
             "analysis": json.loads(row['analysis_json']),
-            "embedding": json.loads(row['embedding_json']) if 'embedding_json' in row.keys() and row['embedding_json'] else None,
             "is_active": bool(row['is_active']),
             "status": "success" # Implicitly success if in DB
         }
@@ -294,10 +339,12 @@ class AetherVault:
         
         if not query.strip():
             # If query is empty, return ALL tools
-            c.execute(f'SELECT * FROM verified_tools {where_clause}')
+            c.execute(f"""SELECT tool_name, trust_score, analysis_json, gallery_json, is_active 
+                         FROM verified_tools {where_clause}""")
         else:
             # Simple LIKE search on the index
-            c.execute(f'''SELECT DISTINCT vt.* FROM verified_tools vt
+            c.execute(f'''SELECT DISTINCT vt.tool_name, vt.trust_score, vt.analysis_json, vt.gallery_json, vt.is_active 
+                         FROM verified_tools vt
                          JOIN search_index si ON vt.tool_name = si.tool_name
                          {where_clause.replace("WHERE", "AND")}
                          AND si.keyword LIKE ?''', (f"%{query.lower()}%",))
@@ -314,7 +361,6 @@ class AetherVault:
                 "trust_score": row['trust_score'],
                 "analysis": json.loads(row['analysis_json']),
                 "gallery": json.loads(row['gallery_json']),
-                "embedding": json.loads(row['embedding_json']) if 'embedding_json' in row.keys() and row['embedding_json'] else None,
                 "is_active": bool(row['is_active']),
             })
             
@@ -388,6 +434,10 @@ class AetherVault:
         conn.commit()
         conn.close()
 
+    def toggle_tool_status(self, tool_name: str, active: bool):
+        """Toggle tool active/inactive status. Alias used by admin endpoints."""
+        self.update_tool_status(tool_name, 1 if active else 0)
+
     def create_scout_task(self, tool_name: str, url: str, email: str) -> int:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -399,11 +449,15 @@ class AetherVault:
         conn.close()
         return task_id
 
-    def update_scout_task(self, task_id: int, status: str, error_message: str = None):
+    def update_scout_task(self, task_id: int, status: str, error_message: str = None, final_tool_name: str = None):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ? WHERE task_id = ?",
-                  (status, error_message, datetime.now(), task_id))
+        if final_tool_name:
+            c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ?, tool_name = ? WHERE task_id = ?",
+                      (status, error_message, datetime.now(), final_tool_name, task_id))
+        else:
+            c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ? WHERE task_id = ?",
+                      (status, error_message, datetime.now(), task_id))
         conn.commit()
         conn.close()
 
@@ -424,7 +478,10 @@ class AetherVault:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM verified_tools WHERE is_active = 0 ORDER BY last_updated DESC")
+        c.execute("""SELECT tool_name, last_updated, trust_score, analysis_json, is_active 
+                     FROM verified_tools 
+                     WHERE is_active = 0 
+                     ORDER BY last_updated DESC""")
         rows = c.fetchall()
         conn.close()
         
@@ -505,18 +562,7 @@ class AetherVault:
         conn.commit()
         conn.close()
 
-    def record_vote(self, voter_uid: str, tool_a: str, tool_b: str, winner: str, category: str, reason: Optional[str] = None):
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''INSERT INTO elo_battles (tool_a, tool_b, winner, category, reason, timestamp, voter_uid)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                  (tool_a.lower(), tool_b.lower(), winner.lower(), category, reason, datetime.now(), voter_uid))
-        
-        # Also increment user vote count
-        c.execute("UPDATE users SET votes_count = votes_count + 1, points = points + 10 WHERE uid = ?", (voter_uid,))
-        
-        conn.commit()
-        conn.close()
+
 
     def get_user_rankings(self, limit: int = 10) -> List[Dict]:
         conn = sqlite3.connect(DB_PATH)
@@ -527,43 +573,9 @@ class AetherVault:
         conn.close()
         return [dict(r) for r in rows]
 
-    def get_random_tool_pair(self, category: Optional[str] = None) -> List[Dict]:
-        """Gets two random tools for a battle."""
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        
-        if category:
-            c.execute("SELECT * FROM verified_tools WHERE is_active = 1 AND intent_category LIKE ? ORDER BY RANDOM() LIMIT 2", (f"%{category}%",))
-        else:
-            c.execute("SELECT * FROM verified_tools WHERE is_active = 1 ORDER BY RANDOM() LIMIT 2")
-            
-        rows = c.fetchall()
-        conn.close()
-        
-        results = []
-        for row in rows:
-            results.append({
-                "tool_name": row['tool_name'],
-                "analysis": json.loads(row['analysis_json']),
-                "trust_score": row['trust_score']
-            })
-        return results
 
-    def update_tool_trust_score(self, tool_name: str, new_trust_score: float, reason: str = "Elo Battle Update"):
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("UPDATE verified_tools SET trust_score = ?, last_updated = ? WHERE tool_name = ?", 
-                  (new_trust_score, datetime.now(), tool_name.lower()))
-        
-        # Log to audit history
-        c.execute('''INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)
-                     VALUES (?, ?, ?, ?, ?)''',
-                  (tool_name.lower(), datetime.now(), "Score Updated", reason, new_trust_score))
-        
-        conn.commit()
-        conn.close()
-        print(f"[Vault] Tool '{tool_name}' Trust Score updated to {new_trust_score} due to {reason}.")
+
+
 
     def get_vendor_insights(self, tool_name: str) -> Dict:
         """
@@ -575,21 +587,6 @@ class AetherVault:
         
         name_lower = tool_name.lower()
         
-        # 1. Battle Stats
-        c.execute("SELECT COUNT(*) FROM elo_battles WHERE tool_a = ? OR tool_b = ?", (name_lower, name_lower))
-        total_battles = c.fetchone()[0] or 0
-        
-        c.execute("SELECT COUNT(*) FROM elo_battles WHERE winner = ?", (name_lower,))
-        wins = c.fetchone()[0] or 0
-        
-        win_rate = (wins / total_battles * 100) if total_battles > 0 else 0
-        
-        # 2. Loss Reasons (Intelligence)
-        c.execute('''SELECT reason, winner, timestamp FROM elo_battles 
-                     WHERE (tool_a = ? OR tool_b = ?) AND winner != ? AND winner != 'draw' AND reason IS NOT NULL
-                     ORDER BY timestamp DESC LIMIT 20''', (name_lower, name_lower, name_lower))
-        loss_reasons = [dict(r) for r in c.fetchall()]
-
         # 3. Missed Searches (Market Demand)
         # We look for queries that have NO match and might be relevant to this tool's category
         c.execute("SELECT intent_category FROM verified_tools WHERE tool_name = ?", (name_lower,))
@@ -602,23 +599,11 @@ class AetherVault:
                      ORDER BY count DESC LIMIT 10''')
         missed_searches = [dict(r) for r in c.fetchall()]
         
-        # 4. Competitor Comparison
-        # Find tools that often win against this tool
-        c.execute('''SELECT winner as competitor, COUNT(*) as win_count FROM elo_battles 
-                     WHERE (tool_a = ? OR tool_b = ?) AND winner != ? AND winner != 'draw'
-                     GROUP BY winner 
-                     ORDER BY win_count DESC LIMIT 5''', (name_lower, name_lower, name_lower))
-        competitors = [dict(r) for r in c.fetchall()]
-        
         conn.close()
         
         return {
             "tool_name": tool_name,
-            "total_battles": total_battles,
-            "win_rate": round(win_rate, 2),
-            "loss_reasons": loss_reasons,
-            "missed_searches": missed_searches,
-            "competitor_comparison": competitors
+            "missed_searches": missed_searches
         }
 
     # --- Phase 8: Live Benchmarking ---

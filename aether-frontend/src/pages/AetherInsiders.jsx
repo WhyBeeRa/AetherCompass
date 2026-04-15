@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Target, Trophy, Swords, Zap, Users, Star, CheckCircle } from 'lucide-react';
+import { Shield, Target, Trophy, Zap, Users, Star, CheckCircle } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -140,20 +140,12 @@ const AetherInsiders = ({ setAppError }) => {
                   </div>
 
                   <div className="grid grid-cols-2 w-full gap-4">
-                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                      <span className="text-[10px] text-white/40 uppercase font-black block mb-1">XP Points</span>
-                      <span className="text-2xl font-black text-cyan-400">{profile?.points || 0}</span>
-                    </div>
-                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                      <span className="text-[10px] text-white/40 uppercase font-black block mb-1">Avg ELO</span>
-                      <span className="text-2xl font-black text-indigo-400">{profile?.elo || 1200}</span>
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex items-center justify-center">
+                      <span className="text-[10px] text-white/40 uppercase font-black block">COMMUNITY MEMBER</span>
                     </div>
                   </div>
 
-                  <button className="w-full py-4 bg-gradient-to-r from-cyan-500 to-indigo-600 rounded-2xl text-white font-black italic tracking-tight hover:scale-105 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center gap-2 opacity-50 cursor-not-allowed">
-                    <Swords className="w-5 h-5" />
-                    BATTLES (PHASE 2)
-                  </button>
+
                   
                   <button 
                     onClick={() => setShowScoutModal(true)}

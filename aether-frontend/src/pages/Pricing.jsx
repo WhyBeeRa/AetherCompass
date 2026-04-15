@@ -60,7 +60,7 @@ export default function Pricing() {
                                 { text: 'חיפוש והשוואה בסיסיים', icon: CheckCircle2 },
                                 { text: 'התראות שבועיות (Newsletter)', icon: CheckCircle2 },
                                 { text: 'ניהול "My Stack" (עד 3 כלים)', icon: CheckCircle2 },
-                                { text: 'Power Vote רגיל ב-Elo Battles', icon: CheckCircle2 }
+                                { text: 'גישה לקהילת ה-Insiders (Limited)', icon: CheckCircle2 }
                             ].map((item, idx) => (
                                 <li key={idx} className="flex items-center gap-4">
                                     <item.icon className="w-5 h-5 text-white/30 shrink-0" />
@@ -105,7 +105,7 @@ export default function Pricing() {
                                 { text: 'the Pulse (מדד ביצועים חי)', icon: Zap },
                                 { text: 'Unlimited Stack + Memory', icon: CheckCircle2 },
                                 { text: 'סקירה מוקדמת של כלי "Hunt"', icon: ShieldCheck },
-                                { text: 'Double Elo Power (השפעה x2)', icon: CheckCircle2 }
+                                { text: 'גישת VIP לקהילת ה-Insiders', icon: CheckCircle2 }
                             ].map((item, idx) => (
                                 <li key={idx} className="flex items-center gap-4">
                                     <item.icon className="w-5 h-5 text-emerald-400 shrink-0" />

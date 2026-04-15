@@ -20,9 +20,10 @@ export default function Home({ setAppError }) {
         setHasResults(false);
         setAppError(null);
 
-        // Create an AbortController for a 60-second fetch timeout
+        // Create an AbortController for a 45-second fetch timeout
+        // (search is now local/fast, but Render cold start can take 20-30s)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
         try {
             // Target the Semantic Search Engine
@@ -37,6 +38,10 @@ export default function Home({ setAppError }) {
             }
 
             const data = await resp.json();
+
+            // Labor Illusion UX Delay: Even if local embedding finishes in 10ms,
+            // we hold the loading state for 1.5 seconds so the user feels the "AI magic".
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             if (data && data.length > 0) {
                 setResults(data.slice(0, 3));
