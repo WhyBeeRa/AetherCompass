@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Shield, 
@@ -22,7 +22,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
-import { apiFetch } from '../api';
+import { apiFetch, API_BASE } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Sub-Components (Sections) ---
@@ -41,12 +41,46 @@ const SystemPulse = () => {
   const [activeLog, setActiveLog] = useState('tasks');
   const [isPulsing, setIsPulsing] = useState(false);
   const [connectionActive, setConnectionActive] = useState(true);
+  const [telemetry, setTelemetry] = useState({
+    ram_usage: 'N/A',
+    db_status: 'N/A',
+    embedder: 'N/A'
+  });
+  const terminalRef = useRef(null);
+  const wsRef = useRef(null);
+
+  const fetchTelemetry = async () => {
+    try {
+      const res = await apiFetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        setTelemetry(data);
+      }
+    } catch (err) {
+      console.error("Telemetry error:", err);
+    }
+  };
+
+  const fetchLogs = async () => {
+    try {
+      const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
+      const resLogs = await apiFetch(`/admin/logs?log_type=${activeLog}&lines=50`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (resLogs.ok) {
+        const dataLogs = await resLogs.json();
+        setLogs(dataLogs.lines || []);
+      }
+    } catch (err) {
+      console.error("Log fetch error:", err);
+    }
+  };
 
   const fetchDiagnostics = async () => {
     try {
       const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
       
-      // Heartbeat
+      // Heartbeat Only
       const resHb = await apiFetch('/admin/heartbeat', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -55,23 +89,7 @@ const SystemPulse = () => {
         setHeartbeat(dataHb);
         setIsPulsing(true);
         setTimeout(() => setIsPulsing(false), 600);
-      }
-
-      // Logs
-      const resLogs = await apiFetch(`/admin/logs?log_type=${activeLog}&lines=50`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (resLogs.ok) {
         setConnectionActive(true);
-        const dataLogs = await resLogs.json();
-        const incomingLines = dataLogs.lines || [];
-        setLogs(prev => {
-            // Merge and keep last 200
-            const combined = [...prev, ...incomingLines];
-            // Deduplicate to avoid overlap from repeated polling
-            const unique = combined.filter((line, index) => combined.indexOf(line) === index);
-            return unique.slice(-200);
-        });
       } else {
         setConnectionActive(false);
       }
@@ -85,9 +103,56 @@ const SystemPulse = () => {
 
   useEffect(() => {
     fetchDiagnostics();
-    const interval = setInterval(fetchDiagnostics, 3000);
-    return () => clearInterval(interval);
+    fetchTelemetry();
+    fetchLogs();
+    
+    // Initialize WebSocket for Live Logs
+    const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
+    const wsHost = API_BASE.replace(/^https?:\/\//, '');
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/logs`;
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+        setConnectionActive(true);
+        console.log("WebSocket connected to:", wsUrl);
+    };
+
+    ws.onmessage = (event) => {
+        const message = event.data;
+        setLogs(prev => {
+            const updated = [...prev, message];
+            return updated.slice(-200); // Keep last 200 lines
+        });
+    };
+
+    ws.onclose = () => {
+        setConnectionActive(false);
+        console.log("WebSocket disconnected");
+    };
+
+    ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        setConnectionActive(false);
+    };
+
+    const diagInterval = setInterval(fetchDiagnostics, 3000);
+    const telInterval = setInterval(fetchTelemetry, 10000);
+
+    return () => {
+      clearInterval(diagInterval);
+      clearInterval(telInterval);
+      if (wsRef.current) wsRef.current.close();
+    };
   }, [activeLog]);
+
+  // Auto-scroll terminal
+  useEffect(() => {
+    if (terminalRef.current) {
+        terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -111,17 +176,19 @@ const SystemPulse = () => {
             </div>
             <div className="flex justify-between items-center text-sm">
                 <span className="text-white/40">Embedder (ONNX)</span>
-                <span className={`font-bold ${heartbeat?.embedder_status === 'READY' ? 'text-cyan-400' : 'text-rose-400'}`}>
-                    {heartbeat?.embedder_status || 'LOADING...'}
+                <span className={`font-bold ${telemetry.embedder === 'Online' ? 'text-cyan-400' : 'text-rose-400'}`}>
+                    {telemetry.embedder}
                 </span>
             </div>
             <div className="flex justify-between items-center text-sm">
                 <span className="text-white/40">Database</span>
-                <span className="text-white/80">{heartbeat?.database_status || 'N/A'}</span>
+                <span className={`font-bold ${telemetry.db_status === 'Connected' ? 'text-white/80' : 'text-rose-400'}`}>
+                    {telemetry.db_status}
+                </span>
             </div>
              <div className="flex justify-between items-center text-sm mb-4">
                 <span className="text-white/40">RAM Usage</span>
-                <span className="text-white/80">{heartbeat?.memory_usage_mb != null ? `${heartbeat.memory_usage_mb} MB` : 'N/A'}</span>
+                <span className="text-white/80 font-mono">{telemetry.ram_usage}</span>
             </div>
 
             <button 
@@ -157,11 +224,11 @@ const SystemPulse = () => {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">System Load</div>
+                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">System Load (RAM)</div>
                 <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
                     <motion.div 
                         initial={{ width: 0 }} 
-                        animate={{ width: '42%' }} 
+                        animate={{ width: telemetry.ram_usage !== 'N/A' ? telemetry.ram_usage : '0%' }} 
                         className="h-full bg-indigo-500" 
                     />
                 </div>
@@ -208,7 +275,10 @@ const SystemPulse = () => {
                 </button>
             </div>
         </div>
-        <div className="p-6 bg-black min-h-[400px] max-h-[600px] overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-hide">
+        <div 
+            ref={terminalRef}
+            className="p-6 bg-black min-h-[400px] max-h-[600px] overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-hide"
+        >
             {loading ? (
                 <div className="flex items-center justify-center h-full text-white/20 animate-pulse">Initializing direct neural link...</div>
             ) : logs.length === 0 ? (
