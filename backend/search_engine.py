@@ -22,14 +22,14 @@ class AetherSearchEngine:
         self.embedder = embedder
         self.vault = vault
 
-    async def semantic_search(self, query: str) -> List[Dict]:
+    async def semantic_search(self, query: str, limit: int = 5) -> List[Dict]:
         """
         Zero-API Semantic Search:
         1. Check if embedder is ready.
         2. Embed query locally via FastEmbed (~5ms).
         3. Cosine similarity against all stored tool vectors.
         4. Weighted ranking: 0.7 * similarity + 0.3 * trust_score.
-        5. Return top 5 results with match_reason from stored data
+        5. Return top results with match_reason from stored data
         """
         # 0. CHECK IF ENGINE IS READY
         if not self.embedder.is_ready():
@@ -43,16 +43,17 @@ class AetherSearchEngine:
             return []
 
         # 2. LOAD ALL TOOL VECTORS FROM DB
-        #    Returns: List[(tool_name, trust_score, vector, analysis_dict)]
+        #    Returns: List[(tool_name, trust_score, vector, analysis_dict, is_active)]
+        # We need to update persistence to return is_active if it doesn't
         all_tools = self.vault.get_all_embeddings()
 
         if not all_tools:
             # Fallback to keyword search if no embeddings exist yet
-            return self._keyword_fallback(query)
+            return self._keyword_fallback(query, limit)
 
         # 3. COSINE SIMILARITY + TRUST SCORE WEIGHTING
         scored = []
-        for tool_name, trust_score, tool_vector, analysis in all_tools:
+        for tool_name, trust_score, tool_vector, analysis, is_active in all_tools:
             t_norm = np.linalg.norm(tool_vector)
             
             if q_norm == 0 or t_norm == 0:
@@ -65,15 +66,15 @@ class AetherSearchEngine:
             # trust_score is 0-100, normalize to 0-1
             combined_score = 0.7 * similarity + 0.3 * (trust_score / 100.0)
 
-            scored.append((combined_score, similarity, tool_name, trust_score, analysis))
+            scored.append((combined_score, similarity, tool_name, trust_score, analysis, is_active))
 
-        # 4. SORT & TOP 5
+        # 4. SORT & TOP LIMIT
         scored.sort(key=lambda x: x[0], reverse=True)
-        top_results = scored[:5]
+        top_results = scored[:limit]
 
         # 5. FORMAT RESPONSE (same API contract as before)
         formatted = []
-        for combined, sim, tool_name, trust_score, analysis in top_results:
+        for combined, sim, tool_name, trust_score, analysis, is_active in top_results:
             # Only return tools with meaningful similarity (filter noise)
             if sim < 0.20:
                 continue
@@ -100,18 +101,19 @@ class AetherSearchEngine:
                 "similarity": round(sim, 4),
                 "metrics": analysis.get("metrics", {}),
                 "summary": summary,
+                "is_active": is_active
             })
 
         return formatted
 
-    def _keyword_fallback(self, query: str) -> List[Dict]:
+    def _keyword_fallback(self, query: str, limit: int = 5) -> List[Dict]:
         """
         Fallback when no embeddings exist.
         Uses basic keyword search from the vault.
         """
         results = self.vault.search_tools(query, include_inactive=False)
         fallback = []
-        for r in results[:5]:
+        for r in results[:limit]:
             analysis = r.get("analysis", {})
             summary = analysis.get("executive_summary", "")
             if not summary and not analysis.get("job_to_be_done"):
@@ -132,5 +134,7 @@ class AetherSearchEngine:
                 "similarity": 0.0,
                 "metrics": analysis.get("metrics", {}),
                 "summary": summary,
+                "is_active": r.get("is_active", True)
             })
         return fallback
+

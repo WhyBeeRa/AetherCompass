@@ -45,22 +45,16 @@ app = FastAPI(title="Aeather API", description="Backend for the Agentic Grid", v
 origins = [
     "https://www.aethercompass.com",
     "https://aethercompass.com",
-    "https://api.aethercompass.com",
-    "http://www.aethercompass.com",
-    "http://aethercompass.com",
+    "https://aethercompass.vercel.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost",
-    "http://127.0.0.1",
-    "http://localhost:80",
     "http://localhost:8000",
-    "http://127.0.0.1:8000",
 ]
 
 # 3. Middleware Injection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -107,6 +101,12 @@ async def startup_event():
     
     # [Liveliness Indicator] Signal kernel status to the terminal
     await log_terminal("[SYSTEM] Aether Kernel Online - Command Center Linked")
+    
+    # Check for critical environment variables
+    if not os.getenv("GEMINI_API_KEY"):
+        await log_terminal("[CRITICAL] GEMINI_API_KEY is missing! Autonomous agents will be disabled.")
+    else:
+        await log_terminal("[SYSTEM] GEMINI_API_KEY detected. Agent brains ready.")
 
     initialize_firebase_admin()
     seed_file = Path(__file__).parent / "seed_data.json"
@@ -312,14 +312,20 @@ def get_gallery_feed():
     return full_feed
 
 @app.get("/vault/search")
-def search_vault(q: str):
+async def search_vault(q: str):
     """
     Direct search in the Vault, excluding ghost tools.
+    Supports semantic search if query is provided.
     """
-    results = vault.search_tools(q, include_inactive=False)
-    # Log search for analytics (Phase 5)
     if q.strip():
+        # Perform semantic search with a higher limit for the Vault view
+        results = await search_engine.semantic_search(q, limit=50)
+        # Log search for analytics (Phase 5)
         vault.log_search(q, has_match=len(results) > 0)
+        return results
+    else:
+        # Default view: all tools via keyword engine (which returns all if q is empty)
+        results = vault.search_tools("", include_inactive=False)
         
     # Filter out empty entries and seeded placeholders
     valid_results = []
@@ -964,8 +970,14 @@ async def websocket_logs(websocket: WebSocket):
     await log_streamer.connect(websocket)
     try:
         while True:
-            # Keep the connection open
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            try:
+                payload = json.loads(data)
+                if payload.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+            except Exception:
+                # If not JSON or doesn't match format, just ignore to keep loop alive
+                pass
     except WebSocketDisconnect:
         log_streamer.disconnect(websocket)
     except Exception:

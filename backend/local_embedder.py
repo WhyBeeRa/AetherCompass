@@ -18,8 +18,8 @@ class LocalEmbeddingEngine:
     _session = None
     _tokenizer = None
 
-    EMBEDDING_DIM = 384  # bge-small-en-v1.5 output dimension
-    MODEL_ID = "BAAI/bge-small-en-v1.5"
+    EMBEDDING_DIM = 384  # paraphrase-multilingual-MiniLM-L12-v2 output dimension
+    MODEL_ID = "Xenova/paraphrase-multilingual-MiniLM-L12-v2"
     CACHE_DIR = os.environ.get("FASTEMBED_CACHE_DIR", "/tmp/fastembed_cache")
 
     @classmethod

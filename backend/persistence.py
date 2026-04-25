@@ -240,17 +240,17 @@ class AetherVault:
         conn.close()
         print(f"[Vault] Binary embedding saved for '{tool_name}'.")
 
-    def get_all_embeddings(self) -> List[Tuple[str, float, np.ndarray, dict]]:
+    def get_all_embeddings(self) -> List[Tuple[str, float, np.ndarray, dict, int]]:
         """
         Bulk-loads all active tool embeddings for the search engine.
-        Returns list of (tool_name, trust_score, embedding_vector, analysis_dict).
+        Returns list of (tool_name, trust_score, embedding_vector, analysis_dict, is_active).
         Reconstructs numpy arrays from binary BLOB using np.frombuffer.
         """
         conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
-        c.execute("SELECT tool_name, trust_score, embedding_blob, analysis_json FROM verified_tools WHERE is_active = 1")
+        c.execute("SELECT tool_name, trust_score, embedding_blob, analysis_json, is_active FROM verified_tools WHERE is_active = 1")
         rows = c.fetchall()
         conn.close()
         
@@ -270,7 +270,8 @@ class AetherVault:
                 row_dict['tool_name'],
                 row_dict['trust_score'],
                 vector,
-                analysis
+                analysis,
+                row_dict['is_active']
             ))
         
         return results
