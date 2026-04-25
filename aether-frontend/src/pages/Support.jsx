@@ -16,9 +16,15 @@ export default function Support() {
             <main className="w-full max-w-5xl px-6 flex flex-col items-center text-center">
                 
                 {/* Navigation Back */}
-                    <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> 
-                    {t('settings.back_home')}
-                </button>
+                <div className="w-full flex justify-start mb-12">
+                    <button 
+                        onClick={() => navigate('/')}
+                        className="group flex items-center gap-2 text-white/40 hover:text-white transition-colors font-medium text-sm"
+                    >
+                        <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> 
+                        {t('settings.back_home')}
+                    </button>
+                </div>
 
                 {/* Hero Header */}
                 <div className="mb-16 max-w-2xl">
