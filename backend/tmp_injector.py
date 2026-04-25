@@ -22,7 +22,7 @@ async def inject_mocks():
             "pros": ["Top-tier coding ability", "Fast response", "Large context window"],
             "cons": ["Cannot generate images", "Stricter safety filters"],
             "use_cases": ["Software Development", "Content Creation", "Data Analysis"],
-            "metrics": {"accuracy": 5, "speed": 5, "value": 4, "ease_of_use": 4, "learning_curve": "קל מאוד", "pricing": "Freemium", "integration": "Web / API"},
+            "metrics": {"accuracy": 5, "speed": 5, "value": 4, "ease_of_use": 4, "learning_curve": "Very Easy", "pricing": "Freemium", "integration": "Web / API"},
             "intents_mapped": [
                 {"intent_description": "Writing code", "success_score": 98, "trade_off": "Can hallucinate complex architecture"},
                 {"intent_description": "Summarizing docs", "success_score": 95, "trade_off": "None"}
@@ -38,7 +38,7 @@ async def inject_mocks():
             "pros": ["Real-time web access", "Citations provided", "Multiple LLM options"],
             "cons": ["Paywall for advanced models", "UI can be cluttered"],
             "use_cases": ["Academic Research", "News Aggregation"],
-            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "Freemium", "integration": "Web / App"},
+            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Freemium", "integration": "Web / App"},
             "intents_mapped": [
                 {"intent_description": "Fact checking", "success_score": 90, "trade_off": "Depends on source quality"}
             ]
@@ -53,7 +53,7 @@ async def inject_mocks():
             "pros": ["Voice mode", "DALL-E integration", "Custom GPTs"],
             "cons": ["Writing requires heavy editing", "Occasional lazy coding"],
             "use_cases": ["Brainstorming", "Everyday tasks", "Translation"],
-            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "Freemium", "integration": "Web / App / API"},
+            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Freemium", "integration": "Web / App / API"},
             "intents_mapped": [
                 {"intent_description": "Drafting emails", "success_score": 92, "trade_off": "Needs tone adjustments"}
             ]
@@ -68,7 +68,7 @@ async def inject_mocks():
             "pros": ["Photorealism", "Artistic styles", "High resolution"],
             "cons": ["Discord interface", "Steep prompting curve"],
             "use_cases": ["Concept Art", "Marketing Assets"],
-            "metrics": {"accuracy": 4, "speed": 3, "value": 4, "ease_of_use": 2, "learning_curve": "בינוני", "pricing": "תשלום חודשי", "integration": "Discord"},
+            "metrics": {"accuracy": 4, "speed": 3, "value": 4, "ease_of_use": 2, "learning_curve": "Moderate", "pricing": "Monthly Subscription", "integration": "Discord"},
             "intents_mapped": [
                 {"intent_description": "Generating realistic photos", "success_score": 95, "trade_off": "Takes multiple iterations"}
             ]
@@ -83,7 +83,7 @@ async def inject_mocks():
             "pros": ["Emotional range", "Voice cloning", "Low latency API"],
             "cons": ["Cost", "Interface is simple"],
             "use_cases": ["Audiobooks", "Video Voiceovers", "Game Assets"],
-            "metrics": {"accuracy": 5, "speed": 4, "value": 4, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "Freemium", "integration": "API / Web"},
+            "metrics": {"accuracy": 5, "speed": 4, "value": 4, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Freemium", "integration": "API / Web"},
             "intents_mapped": [
                 {"intent_description": "Voice cloning", "success_score": 98, "trade_off": "Requires clean audio sample"}
             ]
@@ -98,7 +98,7 @@ async def inject_mocks():
             "pros": ["Cinematic quality", "Text-to-video", "Temporal consistency"],
             "cons": ["expensive", "Character morphing issues"],
             "use_cases": ["B-Roll", "Music Videos", "Ads"],
-            "metrics": {"accuracy": 3, "speed": 3, "value": 4, "ease_of_use": 4, "learning_curve": "בינוני", "pricing": "תשלום חודשי", "integration": "Web"},
+            "metrics": {"accuracy": 3, "speed": 3, "value": 4, "ease_of_use": 4, "learning_curve": "Moderate", "pricing": "Monthly Subscription", "integration": "Web"},
             "intents_mapped": [
                 {"intent_description": "Cinematic B-Roll", "success_score": 85, "trade_off": "Hard to control exact camera moves"}
             ]
@@ -113,7 +113,7 @@ async def inject_mocks():
             "pros": ["IDE native", "Fast autocomplete", "Inline chat"],
             "cons": ["Not as smart as Claude 3.5 Sonnet", "Subscription required"],
             "use_cases": ["Boilerplate coding", "Refactoring", "Writing tests"],
-            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "תשלום חודשי", "integration": "VS Code"},
+            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Monthly Subscription", "integration": "VS Code"},
             "intents_mapped": [
                 {"intent_description": "Autocompleting functions", "success_score": 90, "trade_off": "Requires manual review"}
             ]
@@ -128,7 +128,7 @@ async def inject_mocks():
             "pros": ["Native integration", "Summarizes databases", "Frictionless UI"],
             "cons": ["Uses older models", "Limited outside Notion"],
             "use_cases": ["Meeting notes", "Drafting docs", "Task extraction"],
-            "metrics": {"accuracy": 3, "speed": 4, "value": 4, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "תשלום חודשי", "integration": "App"},
+            "metrics": {"accuracy": 3, "speed": 4, "value": 4, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Monthly Subscription", "integration": "App"},
             "intents_mapped": [
                 {"intent_description": "Summarizing notes", "success_score": 85, "trade_off": "Can miss nuance"}
             ]
@@ -138,12 +138,12 @@ async def inject_mocks():
             "job_to_be_done": ["Graphic Design", "Presentations"],
             "limitations": ["Less profound control than Photoshop", "Template reliant"],
             "privacy_policy": "User opt-in for training",
-            "social_proof": "Made design accessible to fully everyone.",
+            "social_proof": "Made design accessible to everyone.",
             "executive_summary": "The easiest all-in-one AI design suite. Lacks professional-grade manual control.",
             "pros": ["Massive template library", "Magic Eraser", "One-click resize"],
             "cons": ["Repetitive styles", "Sometimes cheesy output"],
             "use_cases": ["Social Media posts", "Pitch decks", "Flyers"],
-            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "Freemium", "integration": "Web / App"},
+            "metrics": {"accuracy": 4, "speed": 5, "value": 5, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Freemium", "integration": "Web / App"},
             "intents_mapped": [
                 {"intent_description": "Removing backgrounds", "success_score": 95, "trade_off": "Struggles with messy hair"}
             ]
@@ -158,7 +158,7 @@ async def inject_mocks():
             "pros": ["Multi-language support", "Enterprise security", "Easy to update"],
             "cons": ["Uncanny valley effect", "Requires subscription"],
             "use_cases": ["Training videos", "Corporate comms", "Sales outreach"],
-            "metrics": {"accuracy": 4, "speed": 4, "value": 4, "ease_of_use": 5, "learning_curve": "קל מאוד", "pricing": "תשלום חודשי", "integration": "Web"},
+            "metrics": {"accuracy": 4, "speed": 4, "value": 4, "ease_of_use": 5, "learning_curve": "Very Easy", "pricing": "Monthly Subscription", "integration": "Web"},
             "intents_mapped": [
                 {"intent_description": "Creating training videos", "success_score": 90, "trade_off": "Lacks human warmth"}
             ]
@@ -174,7 +174,7 @@ async def inject_mocks():
             speed=m_data.get("speed", 3),
             value=m_data.get("value", 3),
             ease_of_use=m_data.get("ease_of_use", 3),
-            learning_curve=m_data.get("learning_curve", "בינוני"),
+            learning_curve=m_data.get("learning_curve", "Moderate"),
             pricing=m_data.get("pricing", "Freemium"),
             integration=m_data.get("integration", "Web / API")
         )

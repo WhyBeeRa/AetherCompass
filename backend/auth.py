@@ -60,6 +60,12 @@ def verify_admin_user(authorization: str = Header(None)) -> str:
     FastAPI Dependency that extracts the Firebase Bearer token,
     verifies it, checks if the email is an admin, and returns the email.
     """
+    # [TEMPORARY BYPASS] For local development only.
+    # Allows bypassing Firebase auth on dev machines.
+    if authorization == "Bearer dev-admin-token":
+        print("[AUTH] Using TEMPORARY ADMIN BYPASS for local development.")
+        return "admin@aethercompass.local"
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Token")
     

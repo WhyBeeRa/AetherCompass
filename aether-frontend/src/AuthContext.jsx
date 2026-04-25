@@ -35,9 +35,22 @@ export function AuthProvider({ children }) {
         return unsubscribe;
     }, []);
 
-    const isAdmin = currentUser?.email && (
-        currentUser.email.toLowerCase() === "yuval@example.com" || 
-        (import.meta.env.VITE_ADMIN_EMAILS?.toLowerCase().split(',').map(e => e.trim()) || []).includes(currentUser.email.toLowerCase())
+    const [isDevAdmin] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        // Lock in dev mode for the duration of the session if localhost is detected once
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (isLocal) {
+            console.log("[Auth] Dev Mode Active: Bypass Enabled");
+            return true;
+        }
+        return false;
+    });
+
+    const isAdmin = !!(
+        isDevAdmin ||
+        // [PRODUCTION] Standard Firebase Admin Whitelist
+        (currentUser?.email && 
+         (import.meta.env.VITE_ADMIN_EMAILS?.toLowerCase().split(',').map(e => e.trim()) || []).includes(currentUser.email.toLowerCase()))
     );
 
     const value = {

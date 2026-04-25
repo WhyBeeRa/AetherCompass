@@ -1,7 +1,7 @@
 {
   "welcome": "What job would you like AI to perform?",
-  "engine_tag": "✦ ARCHITECTURAL MATCHING ENGINE",
-  "search_placeholder": "Example: Build a React and Tailwind app from scratch...",
+  "engine_tag": "ARCHITECTURAL MATCHING ENGINE ✦",
+  "search_placeholder": "...Example: Build a React and Tailwind app from scratch",
   "analyzing": "Analyzing user intent...",
   "search_again": "Search Again",
   "match_tool": "Match tool for me",
@@ -20,11 +20,11 @@
   "no_results_found": "We couldn't find a tool that exactly matches your intent. Try describing it differently.",
   "abort_error": "Deep data processing is taking longer than usual due to core model load. Please try again in a moment.",
   "generic_error": "The guidance engine is experiencing temporary load. The system will recover soon.",
-  "prompts": {
-    "image": "Create realistic and photorealistic images",
-    "deck": "Build an investor deck from text",
-    "debug": "Debug deep server errors (Backend)"
-  },
+  "prompts": [
+    { "id": "image", "label": "Photorealistic AI Image Generation", "intent": "Generative AI for photorealistic images and art" },
+    { "id": "deck", "label": "Build an investor deck from text", "intent": "Create a professional investor pitch deck from raw text" },
+    { "id": "debug", "label": "Debug deep server errors (Backend)", "intent": "Advanced backend debugging and code error analysis" }
+  ],
   "nav": {
     "how_it_works": "How it Works",
     "use_cases": "Use Cases",
@@ -36,14 +36,20 @@
     "hello": "Hello,",
     "settings": "Account Settings",
     "settings_title": "Account Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "admin": "Admin Protocol"
+  },
+  "branding": {
+    "title": "Aether",
+    "subtitle": "Compass",
+    "tagline": "The Ultimate AI Navigator"
   },
   "footer": {
     "product": "Product",
     "tool_index": "Tool Index",
     "vault_live": "Vault (Live Data)",
     "insiders": "Aether Insiders",
-    "pro": "Aether Pro",
+    "support": "Support the Mission",
     "company": "Company",
     "about": "About",
     "blog": "Blog",
@@ -108,7 +114,7 @@
     "tab_profile": "Profile",
     "tab_notifications": "Notifications",
     "tab_security": "Security",
-    "tab_billing": "Billing",
+    "tab_support": "Support",
     "back_home": "Go back",
     "profile_title": "Personal Details",
     "full_name": "Full Name",
@@ -131,10 +137,10 @@
     "security_info_desc": "We use Magic Links or identity providers (Google/GitHub) to maintain the highest level of security. No passwords to steal.",
     "login_history": "Login History",
     "login_history_desc": "View devices that have signed into your account",
-    "billing_title": "Subscription Management",
-    "current_plan": "Current Plan",
-    "free_plan_desc": "Access to basic searches and limited tool saving.",
-    "upgrade_btn": "Upgrade to Pro",
+    "support_title": "Aether Patronage",
+    "current_plan": "Commander's Circle",
+    "support_desc": "Aether is now 100% community-supported. By running our AI models locally (Zero-API), we eliminated third-party costs and privacy risks. Your support covers our infrastructure and keeps the compass spinning.",
+    "support_btn": "Become a Patron",
     "logout": "Sign Out"
   },
   "compare": {
@@ -172,5 +178,101 @@
     "cat_marketing": "Marketing & SEO",
     "cat_presentations": "Investor Decks",
     "cat_enterprise": "Enterprise Tools"
+  },
+  "about": {
+    "era_of_noise": "An Era of",
+    "algorithmic_noise": "Algorithmic Noise.",
+    "noise_subtitle": "The internet is flooded with shallow indices. Results bought with marketing budgets, not earned with quality.",
+    "core_disconnect": "The Core Disconnect",
+    "engineered_reality": "Engineered Reality.",
+    "problem_subtitle": "When searching for an AI solution for a critical task, the first results are rarely the best. They are simply the ones with the largest SEO budgets.",
+    "aether_lab": "The Aether Lab",
+    "objective_compass": "Your Objective Compass.",
+    "solution_subtitle": "We developed internally an autonomous network of agents that challenge marketing hype with field-verified performance audits.",
+    "quality_promise": "Our Quality Promise",
+    "three_pillars": "Built on Three Pillars.",
+    "pillar_brand_title": "Brand Unbiased",
+    "pillar_brand_desc": "Our Trust Score is decoupled from commercial influence. It is calculated through clinical and mathematical auditing only.",
+    "pillar_field_title": "Field-Verified",
+    "pillar_field_desc": "Our agents execute real-world scenarios to ensure the marketing promise matches actual capability on the ground.",
+    "pillar_intent_title": "Intent Focused",
+    "pillar_intent_desc": "Architectural search that logicizes your goal (the Intent), providing precise solutions instead of blind keyword matching.",
+    "zero_api_foundation": "The Foundation",
+    "zero_api_title": "Zero-API Philosophy.",
+    "zero_api_subtitle": "Privacy is not a feature; it's the foundation. We run local ONNX embeddings and logic engines — never sending your raw queries to third-party APIs for processing.",
+    "scout_tag": "The Scout Network",
+    "scout_title": "Autonomous Auditing.",
+    "scout_subtitle": "Our agents don't just read documentation; they probe limits, verify pricing, and check for hidden limitations."
+  },
+  "live_monitor": {
+    "connecting": "Connecting to live performance monitoring...",
+    "response_health": "Response Speed & Health",
+    "last_received": "Last received: {{time}}",
+    "update_pulse": "Update System Pulse",
+    "faster": "faster",
+    "slower": "slower",
+    "reliability": "Access Reliability",
+    "scanning": "Scanning...",
+    "start_scan": "Starting scan...",
+    "scan_success": "Scan triggered successfully",
+    "scan_error": "Error triggering scan",
+    "connection_failed": "Connection failed"
+  },
+  "not_found": {
+    "title": "404 - Page Not Found",
+    "subtitle": "You've reached an area void of insights."
+  },
+  "no_insights": {
+    "title": "No results for this mission"
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "Have information on a tool we missed? Want to report an inaccuracy in our laboratory data? We are here to listen.",
+    "success_title": "Referral sent successfully",
+    "success_subtitle": "We've received your message. Our team will review it and get back to you as soon as possible.",
+    "send_another": "Send another referral",
+    "full_name": "Full Name",
+    "email": "Return Email",
+    "subject": "Subject",
+    "subject_suggestion": "Tool Audit Suggestion",
+    "subject_inaccuracy": "Report Data Inaccuracy",
+    "subject_partnership": "Business / Academic Partnership",
+    "subject_other": "Other",
+    "label_content": "Message Content",
+    "placeholder_content": "Explain your request or inquiry here...",
+    "fast_response": "We respond clinically fast, usually within hours.",
+    "submit": "Send Referral"
+  },
+  "api_docs": {
+    "title_main": "Aether Vault API",
+    "title_sub": "/ Waitlist",
+    "subtitle": "Direct access to Aether's clinical database. We are opening early access for developers building objective recommendation engines, procurement agents, and research platforms.",
+    "tech_capabilities": "Technical Capabilities",
+    "rest_graphql": "Flexible queries across all data models - learning curve, shadow pricing, and Trust Score metrics.",
+    "intent_engine": "Bypass traditional keyword search. Send a raw Intent and receive a prioritized array of tools field-verified by our agents.",
+    "zero_bias": "Guaranteed by SLA: No sponsored placements in organic API responses. Data remains pure and resilient to commercial influence.",
+    "success_title": "Request registered in system.",
+    "success_subtitle": "Our architects will review the details, and we'll get back to you once we release more API keys.",
+    "request_access": "Request API Access",
+    "limited_keys": "Key availability is strictly limited during the initial alpha phase to ensure server stability.",
+    "email_label": "Company / Developer Email",
+    "use_case_label": "Proposed Use Case",
+    "use_case_placeholder": "What are you building with Aether?",
+    "submit": "Submit Request"
+  },
+  "admin": {
+    "analytics": {
+      "title": "Intent Analytics",
+      "subtitle": "What are users really looking for? Real-time data on search intents.",
+      "match_rate": "Match Rate",
+      "total_searches": "Total Searches",
+      "recent_queries": "Recent Queries",
+      "col_query": "Query / Prompt",
+      "col_time": "Time",
+      "col_status": "Status",
+      "loading": "Loading data...",
+      "no_data": "No search data yet.",
+      "error_fetch": "Error loading analytics."
+    }
   }
 }

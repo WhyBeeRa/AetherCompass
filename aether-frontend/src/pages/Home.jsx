@@ -1,46 +1,45 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ShieldCheck, Activity, Box, GitBranch, Coins, Zap, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { ShieldCheck, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { apiFetch } from '../api';
 import PremiumSearchSkeleton from '../components/PremiumSearchSkeleton';
 
 export default function Home({ setAppError }) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [hasResults, setHasResults] = useState(false);
     const [results, setResults] = useState([]);
+    const prompts = Array.isArray(t('prompts', { returnObjects: true })) ? t('prompts', { returnObjects: true }) : [];
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!query.trim()) return;
+    const handleSearch = async (e, forcedQuery) => {
+        if (e) e.preventDefault();
+        const searchQuery = forcedQuery || query;
+        if (!searchQuery.trim()) return;
+
+        if (forcedQuery) setQuery(forcedQuery);
 
         setIsSearching(true);
         setHasResults(false);
         setAppError(null);
 
-        // Create an AbortController for a 45-second fetch timeout
-        // (search is now local/fast, but Render cold start can take 20-30s)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
 
         try {
-            // Target the Semantic Search Engine
-            const resp = await apiFetch(`/search/intent?q=${encodeURIComponent(query)}`, {
+            const resp = await apiFetch(`/search/intent?q=${encodeURIComponent(searchQuery)}`, {
                 signal: controller.signal
             });
 
             if (!resp.ok) {
-                // Determine if it was a server error (500)
                 const errorData = await resp.json().catch(() => null);
                 throw new Error(errorData?.detail || "Semantic Search failed");
             }
 
             const data = await resp.json();
 
-            // Labor Illusion UX Delay: Even if local embedding finishes in 10ms,
-            // we hold the loading state for 1.5 seconds so the user feels the "AI magic".
+            // The "Magic Moment" - 1.5s Labor Illusion
             await new Promise(resolve => setTimeout(resolve, 1500));
 
             if (data && data.length > 0) {
@@ -63,169 +62,127 @@ export default function Home({ setAppError }) {
     };
 
     return (
-        // The main container uses dynamic direction from i18n state
-        <div className="min-h-[85vh] flex flex-col items-center pt-20 px-4 w-full relative overflow-hidden">
-
-            <main className={`w-full flex flex-col items-center transition-all duration-500 relative z-10 ${hasResults ? 'max-w-3xl' : 'max-w-2xl'}`}>
-
-                {/* Hero Header */}
-                {!hasResults && (
-                    <div className="text-center mb-10 transition-opacity duration-500 animate-in fade-in">
-                        <span className="text-cyan-400 font-bold mb-3 block text-xs tracking-widest uppercase">
-                            {t('engine_tag')}
+        <div className="min-h-[85vh] flex flex-col items-center pt-24 px-4 w-full relative overflow-hidden font-sans selection:bg-cyan-500/30">
+            
+            {/* Definitive Entrance: English Hero Section */}
+            {!hasResults && !isSearching && (
+                <main className="w-full max-w-4xl flex flex-col items-center animate-in fade-in duration-1000 slide-in-from-top-4">
+                    
+                    {/* Teal Label */}
+                    <div className="inline-flex items-center gap-2 mb-8 px-4 py-1.5 rounded-full bg-cyan-500/5 border border-cyan-500/20">
+                        <span className="text-[10px] md:text-xs font-bold text-cyan-400 tracking-[0.2em] uppercase">
+                            ARCHITECTURAL MATCHING ENGINE ✦
                         </span>
-                        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-2">
-                            {t('welcome')}
-                        </h1>
                     </div>
-                )}
 
-                {/* Smart Search Bar */}
-                <form onSubmit={handleSearch} className="w-full relative mb-8 z-10">
-                    <div className={`relative flex flex-col w-full p-2 border bg-white/5 backdrop-blur-md rounded-3xl transition-all duration-300 focus-within:border-white/20/30 focus-within:shadow-xl ${hasResults ? 'border-white/20 shadow-md' : 'border-white/20 shadow-lg'}`}>
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder={t('search_placeholder')}
-                            className="w-full bg-transparent text-white placeholder-neutral-400 px-5 pt-4 pb-14 outline-none text-lg resize-none font-medium"
-                            disabled={isSearching}
-                        />
-                        <div className={`absolute bottom-3 ${i18n.dir() === 'rtl' ? 'left-3' : 'right-3'} flex items-center`}>
+                    {/* Bold Global Headline */}
+                    <h1 className="text-5xl md:text-8xl font-black text-white text-center leading-[1] tracking-[-0.04em] mb-12 max-w-4xl drop-shadow-2xl">
+                        What job would you like <br className="hidden md:block" /> AI to perform?
+                    </h1>
+
+
+                    {/* Search Architecture */}
+                    <div className="w-full max-w-3xl mb-12 relative group">
+                        <form 
+                            onSubmit={(e) => handleSearch(e)}
+                            className="relative flex items-center p-2 bg-[#121418]/40 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] transition-all duration-700 focus-within:border-cyan-500/30 focus-within:bg-[#121418]/60 shadow-[0_0_50px_rgba(0,0,0,0.5)] group-hover:border-white/20"
+                        >
+                            <input
+                                type="text"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="...Example: Build a React and Tailwind app from scratch"
+                                className="w-full bg-transparent text-white placeholder-white/20 px-8 py-5 outline-none text-lg md:text-xl font-medium"
+                                disabled={isSearching}
+                            />
                             <button
                                 type="submit"
                                 disabled={isSearching || !query.trim()}
-                                className="px-6 py-2.5 rounded-2xl bg-white/20 backdrop-blur-md border border-white/10 hover:bg-white/10 backdrop-blur-md disabled:bg-white/10 backdrop-blur-md disabled:border-white/20 disabled:text-white/50 text-white text-sm font-semibold transition-all shadow-md"
+                                className="shrink-0 px-10 py-5 rounded-[2rem] bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black uppercase tracking-widest transition-all active:scale-95 shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)]"
                             >
-                                {isSearching ? t('analyzing') : hasResults ? t('search_again') : t('match_tool')}
+                                Match tool
                             </button>
-                        </div>
+                        </form>
                     </div>
-                </form>
 
-                {/* Searching State */}
-                {isSearching && <PremiumSearchSkeleton />}
 
-                {/* Idle State: Prompt Suggestions */}
-                {!hasResults && !isSearching && (
-                    <div className="w-full">
-                        <div className="flex flex-wrap items-center justify-center gap-3 mb-10 w-full animate-in fade-in duration-500 delay-150">
-                            {[
-                                { key: 'image', text: t('prompts.image') },
-                                { key: 'deck', text: t('prompts.deck') },
-                                { key: 'debug', text: t('prompts.debug') },
-                            ].map((prompt, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => setQuery(prompt.text)}
-                                    className="px-5 py-2.5 rounded-full border border-white/20 bg-white/5 backdrop-blur-md text-white/70 hover:bg-white/5 backdrop-blur-md hover:text-white hover:border-white/30 text-sm font-semibold transition-all shadow-sm"
-                                >
-                                    {prompt.text}
-                                </button>
-                            ))}
-                        </div>
+                    {/* Suggestion Pills */}
+                    <div className="flex flex-wrap justify-center gap-4 max-w-3xl animate-in fade-in transition-all duration-700 delay-300">
+                        {prompts.map((p) => (
+                            <button
+                                key={p.id}
+                                onClick={() => handleSearch(null, p.intent)}
+                                className="group/pill px-6 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 text-white/50 hover:text-white text-sm font-medium transition-all flex items-center gap-2 active:scale-95"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-cyan-400 opacity-0 group-hover/pill:opacity-100 transition-opacity" />
+                                {p.label}
+                            </button>
+                        ))}
                     </div>
-                )}
+                </main>
+            )}
 
-                {/* Result State: The 3-Card Drop */}
-                {hasResults && (
-                    <div className="w-full flex flex-col gap-5 mt-4 mb-20 animate-in slide-in-from-top-4 fade-in duration-700">
-                        <div className={`${i18n.dir() === 'rtl' ? 'text-right' : 'text-left'} mb-2`}>
-                            <span className="text-white/60 text-sm font-bold uppercase tracking-widest">
-                                {t('found_results', { count: results.length })}
-                            </span>
-                        </div>
+            {/* Results / Searching State View */}
+            {(isSearching || hasResults) && (
+                <div className="w-full max-w-3xl animate-in fade-in duration-700">
+                    <div className="flex items-center justify-between mb-8 border-b border-white/10 pb-6">
+                        <h2 className="text-xl font-bold text-white tracking-tight">
+                            {isSearching ? "Architecting your matches..." : "Architectural Match Found"}
+                        </h2>
+                        <button 
+                            onClick={() => { setHasResults(false); setQuery(''); }}
+                            className="text-xs text-white/50 hover:text-white transition-colors"
+                        >
+                            New Search
+                        </button>
+                    </div>
 
-                        {results.map((tool, idx) => {
-                            const toolName = tool.tool_name || tool.title || 'Unknown Tool';
-                            const toolId = tool.id || toolName.trim().toLowerCase().replace(/\s+/g, '-');
-                            const reason = tool.match_reason || tool.summary || (tool.analysis && tool.analysis.executive_summary) || t('no_summary');
-                            const primaryIntent = tool.primary_intent || t('general_solution');
-
-                            const isSponsored = tool.is_sponsored || false;
-                            const isTopMatch = isSponsored || idx === 0;
-
-                            const metrics = tool.metrics || (tool.analysis && tool.analysis.metrics) || {};
-                            const pricing = metrics.pricing || tool.pricing || (isSponsored ? 'Enterprise' : 'Freemium');
-                            const learningCurve = metrics.learning_curve || tool.learningCurve || (tool.trust_score > 90 ? 'Easy' : 'Moderate');
-                            const integration = metrics.integration || tool.integration || 'Web / API';
-
-                            return (
-                                <div key={toolId || idx} className={`flex flex-col p-8 rounded-3xl bg-white/5 backdrop-blur-md border transition-all duration-300 ${isTopMatch ? 'border-white/20 shadow-xl scale-[1.01]' : 'border-white/20 shadow-sm hover:shadow-md hover:border-white/30'}`}>
-
-                                    {/* Card Header */}
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="flex flex-col gap-1.5">
-                                            <div className="flex items-center gap-3">
-                                                <h3 className="text-2xl font-bold text-white">
-                                                    {toolName}
-                                                </h3>
-                                                {isTopMatch && <span className="text-xs bg-white/20 backdrop-blur-md text-white px-2.5 py-1 rounded-md font-semibold tracking-wide">{t('top_match')}</span>}
-                                                {isSponsored && <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-md font-semibold tracking-wide border border-amber-200">{t('promoted')}</span>}
+                    {isSearching ? (
+                        <PremiumSearchSkeleton />
+                    ) : (
+                        <div className="space-y-6">
+                            {results.map((tool, idx) => {
+                                const toolId = tool.id || tool.tool_name?.toLowerCase().replace(/\s+/g, '-');
+                                return (
+                                    <div key={toolId || idx} className="p-8 rounded-[2rem] bg-white/5 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 group">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <h3 className="text-2xl font-bold text-white group-hover:text-cyan-400 transition-colors">
+                                                        {tool.tool_name || tool.title}
+                                                    </h3>
+                                                    {idx === 0 && <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold rounded-md tracking-widest uppercase">Top Match</span>}
+                                                </div>
+                                                <p className="text-white/60 leading-relaxed max-w-xl">
+                                                    {tool.match_reason || tool.summary}
+                                                </p>
                                             </div>
-                                            <p className="font-semibold text-emerald-600 text-sm">{t('solving', { intent: primaryIntent })}</p>
-                                            <p className="text-white/70 text-sm mt-3 leading-relaxed max-w-2xl">{reason}</p>
+                                            <Link 
+                                                to={`/tool/${encodeURIComponent(toolId)}`}
+                                                className="p-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
+                                            >
+                                                <ArrowRight className="w-5 h-5" />
+                                            </Link>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-6 text-xs font-bold uppercase tracking-widest text-white/40">
+                                            <div className="flex flex-col gap-1">
+                                                <span>Pricing</span>
+                                                <span className="text-white/80">{tool.metrics?.pricing || tool.pricing || 'Freemium'}</span>
+                                            </div>
+                                            <div className="h-8 w-px bg-white/10" />
+                                            <div className="flex flex-col gap-1">
+                                                <span>Trust Score</span>
+                                                <span className="text-emerald-400">{tool.trust_score}%</span>
+                                            </div>
                                         </div>
                                     </div>
-
-                                    {/* Decision Matrix */}
-                                    <div className="grid grid-cols-3 gap-6 py-5 my-5 border-t border-b border-white/10 bg-white/5 backdrop-blur-md rounded-2xl px-6">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-white/50 text-xs font-bold uppercase tracking-widest">{t('learning_curve')}</span>
-                                            <span className="text-white text-sm font-semibold">{learningCurve}</span>
-                                        </div>
-                                        <div className={`flex flex-col gap-1 ${i18n.dir() === 'rtl' ? 'border-r pr-6' : 'border-l pl-6'} border-white/20`}>
-                                            <span className="text-white/50 text-xs font-bold uppercase tracking-widest">{t('pricing')}</span>
-                                            <span className="text-white text-sm font-semibold">{pricing}</span>
-                                        </div>
-                                        <div className={`flex flex-col gap-1 ${i18n.dir() === 'rtl' ? 'border-r pr-6' : 'border-l pl-6'} border-white/20`}>
-                                            <span className="text-white/50 text-xs font-bold uppercase tracking-widest">{t('integration')}</span>
-                                            <span className="text-white text-sm font-semibold">{integration}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="flex justify-between items-center mt-2">
-                                        <button
-                                            onClick={() => {
-                                                let savedStack = JSON.parse(localStorage.getItem('aether_saved_stack') || '[]');
-                                                const isCurrentlySaved = savedStack.includes(toolId);
-
-                                                if (isCurrentlySaved) {
-                                                    savedStack = savedStack.filter(name => name !== toolId);
-                                                } else {
-                                                    savedStack.push(toolId);
-                                                }
-
-                                                localStorage.setItem('aether_saved_stack', JSON.stringify(savedStack));
-                                                setResults([...results]);
-                                            }}
-                                            className="px-4 py-2 text-sm font-bold transition-all flex items-center gap-2 hover:opacity-80"
-                                        >
-                                            {(() => {
-                                                const savedStack = JSON.parse(localStorage.getItem('aether_saved_stack') || '[]');
-                                                const isSaved = savedStack.includes(toolId);
-                                                return isSaved ? (
-                                                    <><ShieldCheck className="w-4 h-4 text-emerald-400" /> <span className="text-white">{t('in_my_stack')}</span></>
-                                                ) : (
-                                                    <><ShieldCheck className="w-4 h-4 text-white/50" /> <span className="text-white/50">{t('save_to_stack')}</span></>
-                                                );
-                                            })()}
-                                        </button>
-
-                                        <Link to={`/tool/${encodeURIComponent(toolId)}`} className="px-6 py-2.5 text-sm font-bold text-white border border-white/20 rounded-xl hover:bg-white/5 backdrop-blur-md hover:border-white/20 transition-all shadow-sm">
-                                            {t('read_analysis')}
-                                        </Link>
-                                    </div>
-
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-
-            </main>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

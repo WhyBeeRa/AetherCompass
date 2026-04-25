@@ -21,7 +21,7 @@ html.lenis {
 }
 
 body {
-  background-color: #040914;
+  background-color: #02050a;
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -33,5 +33,20 @@ body {
     100% {
       transform: translateX(100%);
     }
+  }
+
+  @keyframes atmospheric-pulse {
+    0%, 100% {
+      opacity: 0.15;
+      transform: scale(1) translate(0, 0);
+    }
+    50% {
+      opacity: 0.3;
+      transform: scale(1.1) translate(20px, -20px);
+    }
+  }
+
+  .animate-atmospheric {
+    animation: atmospheric-pulse 20s ease-in-out infinite;
   }
 }

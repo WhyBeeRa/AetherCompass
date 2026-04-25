@@ -1,6 +1,2 @@
-!!! LOADING ENV FROM: /workspace/backend/.env
+!!! LOADING ENV FROM: C:\Users\Yuval\Documents\GitHub\AetherCompass\backend\.env
 .env file exists
->>> Firebase Admin: Initialized without credentials (limited functionality)
->>> CALLING initialize_firebase_admin()
->>> CALLING initialize_firebase_admin()
->>> Firebase Admin already initialized. Skipping.

@@ -12,11 +12,11 @@ export default function Settings() {
         { id: 'profile', label: t('settings.tab_profile'), icon: User },
         { id: 'notifications', label: t('settings.tab_notifications'), icon: Bell },
         { id: 'security', label: t('settings.tab_security'), icon: Shield },
-        { id: 'billing', label: t('settings.tab_billing'), icon: Wallet },
+        { id: 'support', label: t('settings.tab_support'), icon: Wallet },
     ];
 
     return (
-        <div className="flex flex-col md:flex-row w-full max-w-5xl mx-auto min-h-[80vh] gap-8 animate-in fade-in duration-700 rtl" dir="rtl">
+        <div className="flex flex-col md:flex-row w-full max-w-5xl mx-auto min-h-[80vh] gap-8 animate-in fade-in duration-700 ltr" dir="ltr">
 
             {/* Sidebar Navigation */}
             <aside className="w-full md:w-64 flex flex-col gap-2">
@@ -68,7 +68,7 @@ export default function Settings() {
                                 <button className="px-4 py-2 bg-white/10 backdrop-blur-md text-white text-sm font-medium rounded-lg hover:bg-white/20 backdrop-blur-md transition-colors">
                                     {t('settings.change_photo')}
                                 </button>
-                                <button className="text-xs text-white/60 hover:text-red-500 transition-colors text-right">
+                                <button className="text-xs text-white/60 hover:text-red-500 transition-colors text-left">
                                     {t('settings.remove_photo')}
                                 </button>
                             </div>
@@ -77,7 +77,7 @@ export default function Settings() {
                         <div className="space-y-6">
                             <div className="flex flex-col gap-2">
                                 <label className="text-sm font-semibold text-white/80">{t('settings.full_name')}</label>
-                                <input type="text" defaultValue="יובל בלנק" className="w-full bg-white/5 backdrop-blur-md border border-white/20 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-white/20 transition-all" />
+                                <input type="text" defaultValue="Yuval Blank" className="w-full bg-white/5 backdrop-blur-md border border-white/20 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-white/20 transition-all" />
                             </div>
                             <div className="flex flex-col gap-2">
                                 <label className="text-sm font-semibold text-white/80">{t('settings.email')}</label>
@@ -132,27 +132,27 @@ export default function Settings() {
                                 <p className="text-sm text-amber-700 leading-relaxed">{t('settings.security_info_desc')}</p>
                             </div>
                         </div>
-                        <button className="flex justify-between items-center w-full px-5 py-4 border border-white/20 rounded-xl hover:bg-white/5 backdrop-blur-md transition-colors text-right">
+                        <button className="flex justify-between items-center w-full px-5 py-4 border border-white/20 rounded-xl hover:bg-white/5 backdrop-blur-md transition-colors text-left">
                             <div className="flex flex-col">
                                 <span className="font-medium text-white">{t('settings.login_history')}</span>
                                 <span className="text-sm text-white/60">{t('settings.login_history_desc')}</span>
                             </div>
-                            <ChevronLeft className="w-5 h-5 text-white/50" />
+                            <ChevronLeft className="w-5 h-5 text-white/50 rotate-180" />
                         </button>
                     </div>
                 )}
 
-                {activeTab === 'billing' && (
+                {activeTab === 'support' && (
                     <div className="max-w-xl animate-in fade-in duration-300">
-                        <h2 className="text-xl font-bold text-white mb-6 border-b border-white/10 pb-4">{t('settings.billing_title')}</h2>
+                        <h2 className="text-xl font-bold text-white mb-6 border-b border-white/10 pb-4">{t('settings.support_title')}</h2>
                         <div className="p-8 border border-white/20 rounded-3xl bg-white/5 backdrop-blur-md flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
                             <div>
                                 <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md text-white/80 text-xs font-bold uppercase tracking-wider rounded-lg mb-3">{t('settings.current_plan')}</span>
-                                <h3 className="text-2xl font-bold text-white mb-1">Aether Free</h3>
-                                <p className="text-white/60 text-sm">{t('settings.free_plan_desc')}</p>
+                                <h3 className="text-2xl font-bold text-white mb-1">{t('settings.current_plan')}</h3>
+                                <p className="text-white/60 text-sm leading-relaxed">{t('settings.support_desc')}</p>
                             </div>
-                            <button onClick={() => navigate('/upgrade')} className="px-6 py-3 bg-cyan-600 text-white font-medium rounded-xl hover:bg-cyan-700 transition-colors shadow-lg whitespace-nowrap">
-                                {t('settings.upgrade_btn')}
+                            <button onClick={() => navigate('/support')} className="px-6 py-3 bg-cyan-600 text-white font-medium rounded-xl hover:bg-cyan-700 transition-colors shadow-lg whitespace-nowrap">
+                                {t('settings.support_btn')}
                             </button>
                         </div>
                     </div>

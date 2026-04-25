@@ -76,6 +76,10 @@ class LocalEmbeddingEngine:
 
     # ── public API ──────────────────────────────────────────────
 
+    def is_ready(self) -> bool:
+        """Checks if the ONNX session and tokenizer are initialized."""
+        return self._session is not None and self._tokenizer is not None
+
     def embed(self, text: str) -> np.ndarray:
         """Embed a single text string. Returns float32 numpy array (384,)."""
         encoded = self._tokenizer.encode(text)

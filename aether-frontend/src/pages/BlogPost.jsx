@@ -5,27 +5,27 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion } from 'framer-motion';
 
-// Mock data to enrich the post (in a real app, this metadata could be loaded from an API or frontmatter)
+// Metadata for the posts
 const postsMetadata = {
     "the-seed-strategy": {
-        title: "אסטרטגיית ה-Seed: איך להביא ניתוחים שוברי שוק?",
-        date: "14 מרץ, 2026",
-        readTime: "4 דק' קריאה"
+        title: "Seed Strategy: How to Bring Market-Breaking Analyses?",
+        date: "March 14, 2026",
+        readTime: "4 min read"
     },
     "claude-3-5-sonnet-coding-test": {
-        title: "Claude 3.5 Sonnet תחת המיקרוסקופ: האם מהפכת הקידוד באמת כאן?",
-        date: "12 פברואר, 2026",
-        readTime: "6 דק' קריאה"
+        title: "Claude 3.5 Sonnet Under the Microscope: Is the Coding Revolution Really Here?",
+        date: "February 12, 2026",
+        readTime: "6 min read"
     },
     "rise-of-autonomous-agents": {
-        title: "עלייתם של סוכני ה-AI האוטונומיים: למה Agentic משנה את חוקי המשחק",
-        date: "05 פברואר, 2026",
-        readTime: "8 דק' קריאה"
+        title: "The Rise of Autonomous AI Agents: Why 'Agentic' Changes the Game",
+        date: "February 05, 2026",
+        readTime: "8 min read"
     },
     "ai-writing-tools-turing-test": {
-        title: "כלי כתיבה AI לעומת בני אדם: תוצאות מבחן הטורינג של Aether",
-        date: "28 ינואר, 2026",
-        readTime: "5 דק' קריאה"
+        title: "AI Writing Tools vs. Humans: Results of the Aether Turing Test",
+        date: "January 28, 2026",
+        readTime: "5 min read"
     }
 };
 
@@ -52,7 +52,7 @@ export default function BlogPost() {
                 setError(null);
             } catch (err) {
                 console.error("Error fetching blog post:", err);
-                setError("המאמר לא נמצא או שהייתה שגיאה בטעינתו.");
+                setError("The article was not found or there was an error loading it.");
             } finally {
                 setLoading(false);
             }
@@ -62,12 +62,12 @@ export default function BlogPost() {
     }, [slug]);
 
     return (
-        <div className="min-h-screen w-full flex flex-col items-center bg-[#0a0a0c] pt-24 pb-24 rtl" dir="rtl">
+        <div className="min-h-screen w-full flex flex-col items-center bg-[#0a0a0c] pt-24 pb-24 ltr" dir="ltr">
             <main className="w-full max-w-3xl px-6">
 
                 {/* Fixed Back Button */}
                 <button onClick={() => navigate(-1)} className="text-white/50 hover:text-white mb-12 transition-colors flex items-center gap-2 text-sm font-bold bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-md border border-white/10 aspect-fit inline-flex w-auto mt-4">
-                    <ArrowLeft className="w-4 h-4" /> חזרה
+                    <ArrowLeft className="w-4 h-4" /> Back
                 </button>
 
                 {loading ? (
@@ -77,7 +77,7 @@ export default function BlogPost() {
                         className="flex flex-col items-center justify-center py-20"
                     >
                         <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin mb-4"></div>
-                        <span className="text-white/50 text-sm font-mono tracking-widest uppercase">טוען נתוני מעבדה...</span>
+                        <span className="text-white/50 text-sm font-mono tracking-widest uppercase">Loading lab data...</span>
                     </motion.div>
                 ) : error ? (
                     <motion.div
@@ -86,7 +86,7 @@ export default function BlogPost() {
                         className="flex flex-col items-center justify-center py-20 text-center bg-white/5 border border-white/10 rounded-2xl p-8"
                     >
                         <AlertCircle className="w-12 h-12 text-white/30 mb-4" />
-                        <h2 className="text-2xl font-bold text-white mb-2">שגיאה (404)</h2>
+                        <h2 className="text-2xl font-bold text-white mb-2">Error (404)</h2>
                         <p className="text-white/50">{error}</p>
                     </motion.div>
                 ) : (
@@ -99,7 +99,7 @@ export default function BlogPost() {
                         {postMetadata && (
                             <header className="mb-12 border-b border-white/10 pb-8">
                                 <div className="inline-flex items-center gap-2 px-3 py-1 mb-6 rounded-md bg-white/5 backdrop-blur-md border border-white/10 text-white/50 text-xs font-bold tracking-widest font-mono uppercase">
-                                    <FlaskConical className="w-3 h-3" /> דו״ח מעבדה
+                                    <FlaskConical className="w-3 h-3" /> Lab Report
                                 </div>
                                 <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight mb-6">
                                     {postMetadata.title}

@@ -46,7 +46,7 @@ const AetherInsiders = ({ setAppError }) => {
         }
       } catch (err) {
         console.error("Error fetching profile:", err);
-        if (setAppError) setAppError("נכשל בטעינת פרופיל משתמש");
+        if (setAppError) setAppError("Failed to load user profile");
       }
     };
 
@@ -86,17 +86,17 @@ const AetherInsiders = ({ setAppError }) => {
         }, 3000);
       } else {
         const errorData = await res.json();
-        if (setAppError) setAppError(errorData.detail || "נכשל בשליחת הכלי לבדיקה.");
+        if (setAppError) setAppError(errorData.detail || "Failed to submit tool for audit.");
       }
     } catch (err) {
       console.error(err);
-      if (setAppError) setAppError("שגיאת תקשורת עם השרת.");
+      if (setAppError) setAppError("Server communication error.");
     } finally {
       setScouting(false);
     }
   };
 
-  if (loading) return <div className="min-h-[50vh] flex items-center justify-center text-white/40">מעבד נתוני רשת...</div>;
+  if (loading) return <div className="min-h-[50vh] flex items-center justify-center text-white/40">Processing network data...</div>;
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
@@ -106,7 +106,7 @@ const AetherInsiders = ({ setAppError }) => {
           AETHER INSIDERS
         </h1>
         <p className="text-xl text-white/60 max-w-2xl mx-auto font-medium">
-          הקהילה היא לא פורום, היא מנגנון האימות של העתיד. הצטרפו לארכיטקטים שמעצבים את ה-Truth Score.
+          Community is not a forum; it's the verification mechanism of the future. Join the architects shaping the Truth Score.
         </p>
       </section>
 
@@ -169,7 +169,7 @@ const AetherInsiders = ({ setAppError }) => {
                       {badge}
                     </span>
                   ))}
-                  {!profile?.badges?.length && <p className="text-white/20 text-sm italic">מחל לדרג כלים כדי לקבל תגים...</p>}
+                  {!profile?.badges?.length && <p className="text-white/20 text-sm italic">Start rating tools to earn badges...</p>}
                 </div>
               </div>
             </>
@@ -183,7 +183,7 @@ const AetherInsiders = ({ setAppError }) => {
                   JOIN THE INSIDERS
                 </h3>
                 <p className="text-white/40 text-sm font-medium mt-2">
-                  התחבר כדי לצבור XP, לגלות כלים חדשים ולעצב את דירוגי האמת של הקהילה.
+                  Log in to earn XP, discover new tools, and shape the community's truth ratings.
                 </p>
               </div>
               <Link to="/activation" className="w-full py-4 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-2xl font-black italic tracking-tight hover:bg-cyan-500/20 transition-all flex items-center justify-center gap-2">
@@ -266,7 +266,7 @@ const AetherInsiders = ({ setAppError }) => {
                     <CheckCircle className="w-10 h-10 text-emerald-400" />
                   </div>
                   <h3 className="text-xl font-bold text-white italic">SCOUTING SUCCESSFUL!</h3>
-                  <p className="text-white/60 text-sm">המשימה נקלטה. סוכן ה-AI עובד כרגע על סריקה מעמיקה של הכלי. הוא יופיע לאדמין לאישור ברגע שהדוח יושלם.</p>
+                  <p className="text-white/60 text-sm">Mission received. An AI agent is currently conducting an in-depth scan of the tool. It will appear for admin approval once the report is finalized.</p>
                   <p className="text-cyan-400 font-black text-xs uppercase tracking-widest">+50 XP AWARDED</p>
                 </div>
               ) : (

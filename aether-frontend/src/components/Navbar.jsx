@@ -74,7 +74,7 @@ export function Navbar() {
                                     referrerPolicy="no-referrer"
                                 />
                             </div>
-                            <button onClick={logout} className="p-2 text-white/60 hover:text-rose-400 hover:bg-white/5 rounded-full transition-all" title="התנתק">
+                            <button onClick={logout} className="p-2 text-white/60 hover:text-rose-400 hover:bg-white/5 rounded-full transition-all" title="Sign Out">
                                 <LogOut className="w-5 h-5" />
                             </button>
                         </div>

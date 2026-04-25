@@ -14,3 +14,4 @@ google-genai
 onnxruntime
 tokenizers
 huggingface-hub
+psutil

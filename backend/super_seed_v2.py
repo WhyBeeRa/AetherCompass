@@ -21,7 +21,7 @@ IMAGE_MAP = {
 }
 
 def run_super_seed():
-    print("Initiating High-Quality Alpha Seeding (Kill the Seed Data)...")
+    print("Initiating High-Quality Alpha Seeding (English Translation Mode)...")
     vault = AetherVault()
     
     # 1. ChatGPT (OpenAI)
@@ -30,7 +30,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=5, speed=5, value=5, ease_of_use=5,
             skill_multiplier=4, hallucination_score=4,
-            learning_curve="קל מאוד",
+            learning_curve="Very Easy",
             pricing="Freemium ($20 Plus)",
             integration="API / Web / Mobile",
             latency_label="~1s (Streaming)",
@@ -38,19 +38,19 @@ def run_super_seed():
             privacy_grade="Enterprise Option"
         ),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["כתיבת תוכן", "ניתוח נתונים", "תכנות", "עוזר אישי"],
+        job_to_be_done=["Content Writing", "Data Analysis", "Coding", "Personal Assistant"],
         intents_mapped=[
-            IntentMapping(intent_description="ניתוח קבצי אקסל מורכבים והסקת מסקנות", success_score=98.0, trade_off="מוגבל בכמות שורות גדולה מאוד"),
-            IntentMapping(intent_description="כיוון אסטרטגי שיווקי לעסק קטן", success_score=92.0, trade_off=None),
-            IntentMapping(intent_description="כתיבת קוד Python לאוטומציה", success_score=95.0, trade_off="דורש וולידציה אנושית")
+            IntentMapping(intent_description="Analyze complex Excel files and extract insights", success_score=98.0, trade_off="Limited with extremely large datasets"),
+            IntentMapping(intent_description="Strategic marketing direction for small businesses", success_score=92.0, trade_off=None),
+            IntentMapping(intent_description="Python automation scripting", success_score=95.0, trade_off="Requires human validation")
         ],
-        executive_summary="האולר השוויצרי של עולם הבינה המלאכותית. מצטיין בהבנת הקשר וביצוע משימות רב-תחומיות, אך דורש עין ביקורתית למניעת הלוצינציות.",
-        pros=["רב-תחומיות: מבין כמעט כל נושא ברמה גבוהה", "ממשק ידידותי: חוויית שימוש חלקה ומהירה"],
-        cons=["דיוק: עלול להמציא עובדות בביטחון עצמי (Hallucinations)", "פרטיות: דורש הגדרות ספציפיות למניעת אימון על נתוני משתמש"],
-        use_cases=["ניתוח נתונים (Data Analysis)", "כתיבת תוכן שיווקי", "למידת נושאים חדשים"],
+        executive_summary="The Swiss Army knife of the AI world. Excels at context understanding and multi-disciplinary tasks, but requires a critical eye to prevent hallucinations.",
+        pros=["Versatility: Understands almost any topic at a high level", "Friendly Interface: Smooth and fast user experience"],
+        cons=["Accuracy: May invent facts with high confidence (Hallucinations)", "Privacy: Requires specific settings to prevent training on user data"],
+        use_cases=["Data Analysis", "Marketing Content Writing", "Learning new subjects"],
         measurement_proofs=[
             MeasurementProof(
-                scenario="ניתוח דוח רווח והפסד",
+                scenario="Profit and loss statement analysis",
                 prompt="Analyze this CSV of yearly expenses and identify the top 3 areas where we can cut costs by 15%.",
                 output="[Analysis completed: Identified Cloud Services, Office Rent, and Marketing as top spend. Suggested moving to tier-based AWS, Hybrid work model, and SEO pivot.]",
                 metrics_captured={"latency": "2.1s", "reasoning_steps": 5, "accuracy_check": "Verified"}
@@ -64,7 +64,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=5, speed=4, value=4, ease_of_use=5,
             skill_multiplier=5, hallucination_score=5,
-            learning_curve="קל מאוד",
+            learning_curve="Very Easy",
             pricing="Freemium ($20 Pro)",
             integration="API / Web",
             latency_label="2-3s",
@@ -72,16 +72,16 @@ def run_super_seed():
             privacy_grade="A+"
         ),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["כתיבת קוד", "ניתוח טקסטים ארוכים", "חשיבה לוגית"],
+        job_to_be_done=["Coding", "Long text analysis", "Logical reasoning"],
         intents_mapped=[
-            IntentMapping(intent_description="כתיבת קוד Frontend מורכב עם React", success_score=97.0, trade_off=None),
-            IntentMapping(intent_description="סיכום מסמך PDF של 200 עמודים", success_score=99.0, trade_off="איטי יחסית בעיבוד מסמכי ענק"),
-            IntentMapping(intent_description="חשיבה יצירתית ללא 'טון רובוטי'", success_score=94.0, trade_off=None)
+            IntentMapping(intent_description="Complex Frontend development with React", success_score=97.0, trade_off=None),
+            IntentMapping(intent_description="Summarizing 200-page PDF documents", success_score=99.0, trade_off="Relatively slow on massive files"),
+            IntentMapping(intent_description="Creative thinking without a 'robotic tone'", success_score=94.0, trade_off=None)
         ],
-        executive_summary="המתחרה הצמוד של OpenAI, עם דגש על 'בטיחות' ודיוק יוצא דופן בכתיבת קוד. מרגיש אנושי יותר ופחות מוגבל בתבנית כתיבה.",
-        pros=["דיוק בקוד: מפגין הבנה עמוקה של לוגיקה תכנותית", "חלון הקשר: מסוגל לעבד ספרים שלמים במכה אחת (200K tokens)"],
-        cons=["זמינות: לעיתים סובל מעומסים בגרסה החינמית", "אינטגרציות: פחות אפליקציות צד ג' לעומת ChatGPT"],
-        use_cases=["פיתוח תוכנה", "ניתוח מסמכים משפטיים", "כתיבת תוכן יצירתי"],
+        executive_summary="OpenAI's closest competitor, with an emphasis on 'safety' and exceptional accuracy in code writing. Feels more human and less template-constrained.",
+        pros=["Coding Accuracy: Demonstrates deep understanding of programming logic", "Context Window: Can process entire books in one go (200K tokens)"],
+        cons=["Availability: Sometimes suffers from heavy loads on the free version", "Integrations: Fewer third-party apps compared to ChatGPT"],
+        use_cases=["Software Development", "Legal Document Analysis", "Creative Writing"],
         measurement_proofs=[
             MeasurementProof(
                 scenario="Refactoring Legacy Code",
@@ -98,7 +98,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=5, speed=5, value=5, ease_of_use=5,
             skill_multiplier=3, hallucination_score=5,
-            learning_curve="קל מאוד",
+            learning_curve="Very Easy",
             pricing="Free / $20 mo",
             integration="Web / Extension / Mobile",
             latency_label="Instant Search",
@@ -106,16 +106,16 @@ def run_super_seed():
             privacy_grade="Standard"
         ),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["חיפוש מידע", "מחקר שוק", "אימות עובדות"],
+        job_to_be_done=["Information Search", "Market Research", "Fact Checking"],
         intents_mapped=[
-            IntentMapping(intent_description="מחקר שוק על טרנדים ב-AI ב-2024", success_score=98.5, trade_off=None),
-            IntentMapping(intent_description="מציאת מקורות אקדמיים לנושא ספציפי", success_score=94.0, trade_off="לעיתים מצטט מקורות פחות סמכותיים"),
-            IntentMapping(intent_description="מעקב אחרי חדשות בזמן אמת", success_score=99.0, trade_off=None)
+            IntentMapping(intent_description="Market research on AI trends in 2024", success_score=98.5, trade_off=None),
+            IntentMapping(intent_description="Finding academic sources for a specific topic", success_score=94.0, trade_off="Sometimes cites less authoritative sources"),
+            IntentMapping(intent_description="Real-time news tracking", success_score=99.0, trade_off=None)
         ],
-        executive_summary="האלטרנטיבה המובילה לגוגל. מנוע חיפוש מבוסס AI שמביא תשובות ישירות עם ציטוטים ומקורות חיים מהאינטרנט.",
-        pros=["אמינות: כל תשובה מגובה בציטוטים מהאתר המקורי", "חיסכון בזמן: חוסך כניסה ל-10 אתרים שונים כדי לקבל תשובה אחת"],
-        cons=["עומק: לעיתים התשובות שטחיות לעומת מחקר ידני עמוק", "פרסומות: מתחיל לשלב תוכן ממומן בתוצאות"],
-        use_cases=["מחקר מהיר", "סיכום חדשות יומי", "אימות עובדות (Fact Checking)"],
+        executive_summary="The leading alternative to Google. An AI-powered search engine that brings direct answers with citations and live web sources.",
+        pros=["Reliability: Every answer is backed by citations from the original site", "Time-saving: Avoids visiting 10 different sites to get one answer"],
+        cons=["Depth: Answers can sometimes be superficial compared to deep manual research", "Advertisements: Starting to integrate sponsored content in results"],
+        use_cases=["Rapid Research", "Daily News Summary", "Fact Checking"],
         measurement_proofs=[
              MeasurementProof(
                 scenario="Real-time Financial Search",
@@ -132,7 +132,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=4, speed=3, value=4, ease_of_use=2,
             skill_multiplier=5, hallucination_score=5,
-            learning_curve="קשה",
+            learning_curve="Hard",
             pricing="$10-$60 mo",
             integration="Discord / Web",
             latency_label="~60s",
@@ -140,16 +140,16 @@ def run_super_seed():
             privacy_grade="B"
         ),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["יצירת תמונות", "אמנות דיגיטלית", "עיצוב ויזואלי"],
+        job_to_be_done=["Image Generation", "Digital Art", "Visual Design"],
         intents_mapped=[
-            IntentMapping(intent_description="יצירת צילום מוצר פוטו-ריאליסטי", success_score=99.0, trade_off="דורש כתיבת פרומפטים טכנית מאוד"),
-            IntentMapping(intent_description="עיצוב לוגו וטיפוגרפיה", success_score=60.0, trade_off="עדיין מתקשה בעקביות טקסט"),
-            IntentMapping(intent_description="קונספט ארט למשחקי וידאו", success_score=99.5, trade_off=None)
+            IntentMapping(intent_description="Creating photo-realistic product shots", success_score=99.0, trade_off="Requires highly technical prompt engineering"),
+            IntentMapping(intent_description="Logo and typography design", success_score=60.0, trade_off="Still struggles with text consistency"),
+            IntentMapping(intent_description="Video game concept art", success_score=99.5, trade_off=None)
         ],
-        executive_summary="הסטנדרט המוזהב ליצירת תמונות ב-AI. מניב אסתטיקה שאין לה תחרות, אך מצריך עקומת למידה לשימוש בפרמטרים מורכבים.",
-        pros=["אסתטיקה: איכות ויזואלית שמרגישה כמו צילום אמיתי או אמנות רמה גבוהה", "שליטה: גרסה 6 מאפשרת רמת דיוק גבוהה בפרטים קטנים"],
-        cons=["ממשק: דורש שימוש בדיסקורד (לרוב המשתמשים)", "עקומת למידה: קשה להגיע לתוצאה מושלמת ללא לימוד 'שפת' הפרומפטים"],
-        use_cases=["צילומי אופנה ומוצר", "עיצוב אתרים (UI Hero images)", "אמנות למדיה חברתית"],
+        executive_summary="The gold standard for AI image generation. Produces unmatched aesthetics but requires a learning curve for complex parameters.",
+        pros=["Aesthetics: Visual quality that feels like high-end professional photography or art", "Control: Version 6 allows high precision in small details"],
+        cons=["Interface: Requires Discord usage (for most users)", "Learning Curve: Difficult to achieve perfect results without learning the prompt 'language'"],
+        use_cases=["Fashion & Product Photography", "Website Design (UI Hero images)", "Social Media Art"],
         measurement_proofs=[
              MeasurementProof(
                 scenario="Hyper-realistic Architectural Visualization",
@@ -166,7 +166,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=5, speed=5, value=5, ease_of_use=3,
             skill_multiplier=5, hallucination_score=5,
-            learning_curve="מיועד למפתחים",
+            learning_curve="Developer-Focused",
             pricing="Free / $20 mo",
             integration="VS Code / GitHub",
             latency_label="Instant",
@@ -174,16 +174,16 @@ def run_super_seed():
             privacy_grade="Enterprise Ready"
         ),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["פיתוח תוכנה", "אוטומציית קוד", "דיבוג באגים"],
+        job_to_be_done=["Software Development", "Code Automation", "Bug Debugging"],
         intents_mapped=[
-            IntentMapping(intent_description="בניית אפליקציית Fullstack מאפס", success_score=99.0, trade_off=None),
-            IntentMapping(intent_description="תיקון באגים בספריות קוד גדולות", success_score=95.0, trade_off="דורש גישה לכל קבצי הפרויקט"),
-            IntentMapping(intent_description="כתיבת Unit Tests אוטומטיים", success_score=98.0, trade_off=None)
+            IntentMapping(intent_description="Building full-stack applications from scratch", success_score=99.0, trade_off=None),
+            IntentMapping(intent_description="Fixing bugs in large codebases", success_score=95.0, trade_off="Requires access to all project files"),
+            IntentMapping(intent_description="Writing automated Unit Tests", success_score=98.0, trade_off=None)
         ],
-        executive_summary="עורך הקוד שהחליף את VS Code עבור עשרות אלפי מפתחים. הוא לא רק כותב קוד, אלא מבין את כל מאגר הקוד (Codebase) שלך.",
-        pros=["הבנת הקשר: יודע איך פונקציה בקובץ אחד משפיעה על קובץ אחר", "UI אינטגרטיבי: ה-AI מרגיש חלק טבעי מהכתיבה, לא רק חלונית צד"],
-        cons=["קהל יעד: דורש הבנה טכנית, לא כלי ל-No-code", "משאבים: יכול להיות כבד על הזיכרון (RAM) בפרויקטים ענקיים"],
-        use_cases=["פיתוח React/Next.js", "אופטימיזציית אלגוריתמים", "תיעוד קוד אוטומטי"],
+        executive_summary="The code editor that replaced VS Code for tens of thousands of developers. It doesn't just write code; it understands your entire codebase.",
+        pros=["Context Awareness: Knows how a function in one file affects another", "Integrative UI: The AI feels like a natural part of writing, not just a side panel"],
+        cons=["Target Audience: Requires technical understanding, not a no-code tool", "Resources: Can be RAM-heavy on massive projects"],
+        use_cases=["React/Next.js Development", "Algorithm Optimization", "Automated Code Documentation"],
         measurement_proofs=[
              MeasurementProof(
                 scenario="Adding a complex feature to an existing repo",
@@ -200,7 +200,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=4, speed=4, value=5, ease_of_use=5,
             skill_multiplier=5, hallucination_score=5,
-            learning_curve="קל מאוד",
+            learning_curve="Very Easy",
             pricing="Freemium",
             integration="Web",
             latency_label="~30-60s",
@@ -208,15 +208,15 @@ def run_super_seed():
             privacy_grade="Standard"
         ),
         visual_quality=VisualQuality.MID,
-        job_to_be_done=["יצירת מוזיקה", "הלחנת שירים", "ג'ינגלים"],
+        job_to_be_done=["Music Creation", "Song Composing", "Jingles"],
         intents_mapped=[
-            IntentMapping(intent_description="יצירת שיר פופ מלא עם מילים", success_score=97.0, trade_off=None),
-            IntentMapping(intent_description="הלחנת מוזיקת רקע לסרטוני יוטיוב", success_score=95.0, trade_off=None)
+            IntentMapping(intent_description="Creating full pop songs with lyrics", success_score=97.0, trade_off=None),
+            IntentMapping(intent_description="Composing background music for YouTube videos", success_score=95.0, trade_off=None)
         ],
-        executive_summary="המהפכה של עולם המוזיקה. מייצר שירים מלאים (מילים ושירה) בכל סגנון מבוקש באיכות רדיו מפתיעה.",
-        pros=["איכות קולית: השירה מרגישה אנושית בצורה מדהימה", "מהירות: מייצר שיר של 2 דקות בתוך פחות מדקה"],
-        cons=["שליטה במבנה: קשה לדייק שינויים ספציפיים בתוך השיר (למשל 'שנה רק את הסולו')", "זכויות יוצרים: סוגיות משפטיות שעדיין מתבררות בתעשייה"],
-        use_cases=["שירים בהתאמה אישית", "מוזיקת רקע ליוצרי תוכן"],
+        executive_summary="A revolution in the music world. Generates full songs (lyrics and vocals) in any style with surprising radio quality.",
+        pros=["Vocal Quality: Vocals feel incredibly human", "Speed: Produces a 2-minute song in less than a minute"],
+        cons=["Structure Control: Difficult to fine-tune specific changes within the song (e.g., 'change only the solo')", "Copyright: Legal issues still unfolding in the industry"],
+        use_cases=["Custom Personalized Songs", "Background Music for Creators"],
         measurement_proofs=[
              MeasurementProof(
                 scenario="Creating a Synthwave track",
@@ -233,7 +233,7 @@ def run_super_seed():
         metrics=ToolMetrics(
             accuracy=5, speed=3, value=4, ease_of_use=5,
             skill_multiplier=5, hallucination_score=5,
-            learning_curve="קל מאוד",
+            learning_curve="Very Easy",
             pricing="$24/mo+",
             integration="API / Web",
             latency_label="Minutes (Render)",
@@ -241,112 +241,112 @@ def run_super_seed():
             privacy_grade="A"
         ),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["יצירת וידאו", "דיבוב אוטומטי", "אוואטרים דיגיטליים"],
+        job_to_be_done=["Video Creation", "Automated Dubbing", "Digital Avatars"],
         intents_mapped=[
-            IntentMapping(intent_description="יצירת סרטון הסבר עם אוואטר מדבר", success_score=99.0, trade_off=None),
-            IntentMapping(intent_description="תרגום סרטון לשפות אחרות עם סינכרון שפתיים (Lip-sync)", success_score=98.0, trade_off="דורש וידאו מקורי באיכות גבוהה")
+            IntentMapping(intent_description="Creating explainer videos with talking avatars", success_score=99.0, trade_off=None),
+            IntentMapping(intent_description="Translating video to other languages with lip-sync", success_score=98.0, trade_off="Requires high-quality original video")
         ],
-        executive_summary="הכלי המוביל ליצירת סרטוני אוואטר. מאפשר ליצור סרטונים מקצועיים מטקסט בלבד, עם דמויות שמרגישות ונראות אמיתיות לחלוטין.",
-        pros=["ריאליזם: סינכרון שפתיים (Lip-sync) הכי טוב בשוק", "קלות שימוש: אין צורך במצלמה או תאורה, רק בטקסט"],
-        cons=["עלות: יקר יחסית לשימוש כבד", "זמן רינדור: סרטונים ארוכים לוקחים זמן לעיבוד"],
-        use_cases=["סרטוני הדרכה (L&D)", "שיווק מותאם אישית", "תרגום תוכן גלובלי"],
+        executive_summary="The leading tool for avatar video creation. Allows creating professional videos from text alone, with characters that look and feel completely real.",
+        pros=["Realism: Best lip-sync on the market", "Ease of Use: No need for a camera or lighting, just text"],
+        cons=["Cost: Relatively expensive for heavy use", "Render Time: Long videos take time to process"],
+        use_cases=["Training Videos (L&D)", "Personalized Marketing", "Global Content Translation"],
         measurement_proofs=[]
     )
 
     # 8. ElevenLabs (Voice)
     elevenlabs = LabAnalysis(
         tool_name="ElevenLabs",
-        metrics=ToolMetrics(accuracy=5, speed=5, value=5, ease_of_use=5, learning_curve="קל מאוד", pricing="Freemium"),
+        metrics=ToolMetrics(accuracy=5, speed=5, value=5, ease_of_use=5, learning_curve="Very Easy", pricing="Freemium"),
         visual_quality=VisualQuality.MID,
-        job_to_be_done=["יצירת קול", "דיבוב", "טקסט לדיבור"],
-        executive_summary="מנוע הדיבור האיכותי ביותר בעולם. מסוגל לשכפל קולות ברמת דיוק מבהילה (Cloning) ולייצר הקראת טקסט רגשית וטבעית.",
-        pros=["איכות קול: הטון והאינטונציה הכי פחות רובוטיים שיש", "שכפול קול: מהיר ומדויק להפליא"],
-        cons=["בטיחות: סכנה לזיופים (Deepfakes)", "עלות: גרסאות מתקדמות דורשות מנוי"],
-        use_cases=["ספרי שמע", "קריינות לסרטונים", "נגישות תוכן"]
+        job_to_be_done=["Voice Creation", "Dubbing", "Text-to-Speech"],
+        executive_summary="The highest-quality voice engine in the world. Capable of cloning voices with frightening accuracy and generating natural, emotional speech.",
+        pros=["Voice Quality: The least robotic tone and intonation available", "Voice Cloning: Incredibly fast and accurate"],
+        cons=["Safety: Risk of deepfakes", "Cost: Advanced versions require a subscription"],
+        use_cases=["Audiobooks", "Video Narration", "Content Accessibility"]
     )
 
     # 9. Gamma AI (Presentations)
     gamma = LabAnalysis(
         tool_name="Gamma AI",
-        metrics=ToolMetrics(accuracy=4, speed=5, value=5, ease_of_use=5, learning_curve="קל מאוד", pricing="Freemium"),
+        metrics=ToolMetrics(accuracy=4, speed=5, value=5, ease_of_use=5, learning_curve="Very Easy", pricing="Freemium"),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["מצגות", "בניית מצגות משקיעים"],
-        executive_summary="יוצר מצגות ומסמכים מעוצבים תוך שניות מתוך פרומפט טקסטואלי. חוסך שעות של עבודה על פריסות ועיצוב ב-PowerPoint.",
-        pros=["מהירות: יצירת שלד ומצגת מלאה בתוך רגע", "עיצוב: פריסות מודרניות ואינטראקטיביות"],
-        cons=["גמישות: קשה לעשות שינויים עיצוביים מיקרוסקופיים", "תבניות: יכול להרגיש מעט גנרי בשימוש חוזר"],
-        use_cases=["Pitch Decks", "סיכומי פרויקטים", "מערכי שיעור"]
+        job_to_be_done=["Presentations", "Pitch Deck Building"],
+        executive_summary="Creates beautifully designed presentations and documents in seconds from a text prompt. Saves hours of work on PowerPoint layouts.",
+        pros=["Speed: Generates a full framework and deck in a moment", "Design: Modern and interactive layouts"],
+        cons=["Flexibility: Difficult to make microscopic design changes", "Templates: Can feel slightly generic with repeated use"],
+        use_cases=["Pitch Decks", "Project Summaries", "Lesson Plans"]
     )
 
     # 10. Jasper (Marketing)
     jasper = LabAnalysis(
         tool_name="Jasper",
-        metrics=ToolMetrics(accuracy=4, speed=5, value=4, ease_of_use=4, learning_curve="בינוני", pricing="$39/mo+"),
+        metrics=ToolMetrics(accuracy=4, speed=5, value=4, ease_of_use=4, learning_curve="Medium", pricing="$39/mo+"),
         visual_quality=VisualQuality.MID,
-        job_to_be_done=["שיווק", "כתיבת בלוגים", "Brand Voice"],
-        executive_summary="פלטפורמת כתיבה ממוקדת צוותי שיווק. מצטיינת בשמירה על 'טון המותג' ובאינטגרציה עם כלים כמו SEO Surfer.",
-        pros=["Brand Voice: לומד את הסגנון העסקי שלך", "תבניות שיווק: מאות תבניות מוכנות למודעות ופוסטים"],
-        cons=["מחיר: יקר משמעותית משימוש ישיר ב-ChatGPT", "מורכבות: עמוס בפיצ'רים שיכולים לבלבל משתמש פשוט"],
-        use_cases=["קמפיינים שיווקיים", "כתיבת בלוגים לאופטימיזציית SEO"]
+        job_to_be_done=["Marketing", "Blog Writing", "Brand Voice"],
+        executive_summary="Writing platform focused on marketing teams. Excels at maintaining Brand Voice and integrates with tools like Surfer SEO.",
+        pros=["Brand Voice: Learns your business style", "Marketing Templates: Hundreds of ready-to-use templates for ads and posts"],
+        cons=["Price: Significantly more expensive than direct ChatGPT usage", "Complexity: Loaded with features that can confuse casual users"],
+        use_cases=["Marketing Campaigns", "SEO-optimized Blog Writing"]
     )
 
     # 11. Leonardo.ai (Art/Design)
     leonardo = LabAnalysis(
         tool_name="Leonardo.ai",
-        metrics=ToolMetrics(accuracy=4, speed=4, value=5, ease_of_use=4, learning_curve="בינוני", pricing="Freemium"),
+        metrics=ToolMetrics(accuracy=4, speed=4, value=5, ease_of_use=4, learning_curve="Medium", pricing="Freemium"),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["יצירת תמונות", "עיצוב משחקים", "נכסים ויזואליים"],
-        executive_summary="פלטפורמת עיצוב ויזואלית עוצמתית עם ממשק ווב מצוין. מהווה אלטרנטיבה נגישה ל-Midjourney עם שליטה רבה יותר על המודלים.",
-        pros=["ממשק: אתר נוח מאוד לשימוש, ללא צורך בדיסקורד", "פיצ'רים: כולל Canvas לעריכה ותיקון תמונות"],
-        cons=["עקביות: מגוון רב של מודלים יכול לבלבל", "איכות: בקיצון, Midjourney עדיין מובילה באסתטיקה צילומית"],
-        use_cases=["עיצוב דמויות", "נכסים למשחקים", "מרצ'נדייז"]
+        job_to_be_done=["Image Generation", "Game Design", "Visual Assets"],
+        executive_summary="Powerful visual design platform with an excellent web interface. A more accessible alternative to Midjourney with more model control.",
+        pros=["Interface: Very user-friendly website, no Discord required", "Features: Includes Canvas for editing and fixing images"],
+        cons=["Consistency: Wide variety of models can be confusing", "Quality: At the extreme, Midjourney still leads in photographic aesthetics"],
+        use_cases=["Character Design", "Game Assets", "Merchandise"]
     )
 
     # 12. Phind (Coding Search)
     phind = LabAnalysis(
         tool_name="Phind",
-        metrics=ToolMetrics(accuracy=5, speed=5, value=5, ease_of_use=5, learning_curve="קל מאוד", pricing="Free / Pro"),
+        metrics=ToolMetrics(accuracy=5, speed=5, value=5, ease_of_use=5, learning_curve="Very Easy", pricing="Free / Pro"),
         visual_quality=VisualQuality.MID,
-        job_to_be_done=["חיפוש קוד", "פתרון בעיות תכנות"],
-        executive_summary="מנוע חיפוש המיועד ספציפית למפתחים. משלב תוצאות מהאינטרנט עם תשובות LLM מדויקות ועדכניות.",
-        pros=["עדכניות: מחובר לתיעוד (Doc) הכי חדש ברשת", "מיקוד: חוסך חיפושים ב-StackOverflow"],
-        cons=["רוחב: מיועד רק למשימות קוד ופיתוח", "ממשק: פשוט מאוד, ללא פיצ'רים של IDE מלא"],
-        use_cases=["דיבוג שגיאות קוד", "למידת ספריות חדשות"]
+        job_to_be_done=["Code Search", "Programming Problem Solving"],
+        executive_summary="Search engine specifically designed for developers. Combines web results with accurate and up-to-date LLM answers.",
+        pros=["Freshness: Connected to the latest documentation online", "Focus: Saves searching through StackOverflow"],
+        cons=["Scope: Dedicated only to coding and development tasks", "Interface: Very simple, lacks full IDE features"],
+        use_cases=["Code Error Debugging", "Learning new libraries"]
     )
 
     # 13. Groq (LPU Inference)
     groq = LabAnalysis(
         tool_name="Groq",
-        metrics=ToolMetrics(accuracy=4, speed=5, value=5, ease_of_use=4, learning_curve="בינוני", pricing="Free / API"),
+        metrics=ToolMetrics(accuracy=4, speed=5, value=5, ease_of_use=4, learning_curve="Medium", pricing="Free / API"),
         visual_quality=VisualQuality.LOW,
-        job_to_be_done=["מהירות אינפרנס", "צ'אט מהיר", "API למפתחים"],
-        executive_summary="התשתית המהירה בעולם להרצת מודלי שפה. מסוגל להריץ מודלים כמו Llama 3 במהירות שמרגישה כמו שיחה אנושית חיה.",
-        pros=["מהירות: פי 10-20 יותר מהיר מהמתחרים", "מחיר: זול מאוד בשימוש דרך API"],
-        cons=["מגוון מודלים: מוגבל למודלים של קוד פתוח (Llama, Mixtral)", "מורכבות: מיועד בעיקר למפתחים המטמיעים AI"],
-        use_cases=["צ'אט-בוטים בזמן אמת", "אפליקציות הדורשות תגובה מיידית"]
+        job_to_be_done=["Inference Speed", "Fast Chat", "Developer API"],
+        executive_summary="The fastest infrastructure in the world for running language models. Capable of running models like Llama 3 at speeds that feel like a live human conversation.",
+        pros=["Speed: 10-20x faster than competitors", "Price: Very cheap when used via API"],
+        cons=["Model Variety: Limited to open-source models (Llama, Mixtral)", "Complexity: Primarily for developers implementing AI"],
+        use_cases=["Real-time Chatbots", "Applications requiring instant response"]
     )
 
     # 14. Relume (Sitemap/Site builder)
     relume = LabAnalysis(
         tool_name="Relume",
-        metrics=ToolMetrics(accuracy=5, speed=5, value=5, ease_of_use=4, learning_curve="בינוני", pricing="Freemium"),
+        metrics=ToolMetrics(accuracy=5, speed=5, value=5, ease_of_use=4, learning_curve="Medium", pricing="Freemium"),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["בניית אתרים", "Sitemaps", "Wireframes"],
-        executive_summary="הקומפס לבניית אתרים. משתמש ב-AI כדי לבנות היררכיית אתר, עץ דפים ו-Wireframes בתוך דקות.",
-        pros=["דיוק: ה-AI מבין שלד של אתרי אי-קומרס או B2B בצורה מעולה", "ייצוא: מתחבר ישירות ל-Webflow ו-Figma"],
-        cons=["מיקוד: רלוונטי רק למעצבי אתרים ומפתחי Webflow", "גמישות: דורש שימוש בספריות הרכיבים שלהם"],
-        use_cases=["תכנון אתרים (UX)", "בניית Wireframes מהירה"]
+        job_to_be_done=["Sitemaps", "Wireframes", "Site Building"],
+        executive_summary="The compass for website building. Uses AI to build site hierarchies, page maps, and wireframes in minutes.",
+        pros=["Accuracy: AI understands E-commerce or B2B site structures perfectly", "Export: Connects directly to Webflow and Figma"],
+        cons=["Focus: Relevant only for web designers and Webflow developers", "Flexibility: Requires using their component libraries"],
+        use_cases=["UX Site Planning", "Rapid Wireframe Building"]
     )
 
     # 15. Descript (Video/Audio Editing)
     descript = LabAnalysis(
         tool_name="Descript",
-        metrics=ToolMetrics(accuracy=5, speed=4, value=5, ease_of_use=4, learning_curve="בינוני", pricing="Freemium"),
+        metrics=ToolMetrics(accuracy=5, speed=4, value=5, ease_of_use=4, learning_curve="Medium", pricing="Freemium"),
         visual_quality=VisualQuality.HIGH,
-        job_to_be_done=["עריכת וידאו", "פודקאסטים", "עריכת טקסט"],
-        executive_summary="עריכת וידאו באמצעות עריכת טקסט. הופך את התמלול של הסרטון לכלי העריכה הראשי, כולל מחיקת מילים מיותרות בלחיצת כפתור.",
-        pros=["חדשנות: עריכה מבוססת תמלול חוסכת שעות של חיפוש קטעים", "Overdub: מאפשר לתקן מילים שנאמרו לא נכון באמצעות ה-AI"],
-        cons=["משאבים: דורש התקנת אפליקציה כבדה יחסית", "דיוק תמלול: מתקשה מעט עם עברית לעומת אנגלית"],
-        use_cases=["עריכת פודקאסטים", "יצירת סרטוני הדרכה"]
+        job_to_be_done=["Video Editing", "Podcasting", "Text-Based Editing"],
+        executive_summary="Video editing by editing text. Turns video transcription into the primary editing tool, including deleting filler words with one click.",
+        pros=["Innovation: Translation-based editing saves hours of searching for clips", "Overdub: Fix mistyped words using AI voice"],
+        cons=["Resources: Requires a relatively heavy application installation", "Transcription: Slightly struggles with Hebrew compared to English"],
+        use_cases=["Podcast Editing", "Explainer Video Creation"]
     )
 
     tools_data = [
@@ -381,7 +381,7 @@ def run_super_seed():
         audit = AuditLog(tool_name=tool_name, action="Alpha Verification", reason="Deep Analysis + Evidence Grid Implementation", new_trust_score=score)
         vault.save_tool(tool_name=tool_name, analysis=analysis, trust_score=score, gallery=gallery, audit_log=audit)
         
-    print(f"Successfully seeded {len(tools_data)} high-quality tools.")
+    print(f"Successfully seeded {len(tools_data)} high-quality tools in English.")
 
 if __name__ == "__main__":
     run_super_seed()

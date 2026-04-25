@@ -25,11 +25,16 @@ class AetherSearchEngine:
     async def semantic_search(self, query: str) -> List[Dict]:
         """
         Zero-API Semantic Search:
-        1. Embed query locally via FastEmbed (~5ms).
-        2. Cosine similarity against all stored tool vectors.
-        3. Weighted ranking: 0.7 * similarity + 0.3 * trust_score.
-        4. Return top 5 with match_reason from pre-stored analysis.
+        1. Check if embedder is ready.
+        2. Embed query locally via FastEmbed (~5ms).
+        3. Cosine similarity against all stored tool vectors.
+        4. Weighted ranking: 0.7 * similarity + 0.3 * trust_score.
+        5. Return top 5 results with match_reason from stored data
         """
+        # 0. CHECK IF ENGINE IS READY
+        if not self.embedder.is_ready():
+            raise RuntimeError("System initializing")
+
         # 1. EMBED QUERY LOCALLY
         query_vector = self.embedder.embed(query)
         q_norm = np.linalg.norm(query_vector)
@@ -49,11 +54,12 @@ class AetherSearchEngine:
         scored = []
         for tool_name, trust_score, tool_vector, analysis in all_tools:
             t_norm = np.linalg.norm(tool_vector)
-            if t_norm == 0:
+            
+            if q_norm == 0 or t_norm == 0:
                 continue
-
-            # Cosine similarity: dot(q, t) / (||q|| * ||t||)
-            similarity = float(np.dot(query_vector, tool_vector) / (q_norm * t_norm))
+                
+            dot_prod = np.dot(query_vector, tool_vector)
+            similarity = float(dot_prod / (q_norm * t_norm))
 
             # Weighted score: 70% semantic match + 30% trust
             # trust_score is 0-100, normalize to 0-1

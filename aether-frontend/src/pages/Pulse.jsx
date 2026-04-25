@@ -110,13 +110,13 @@ export default function Pulse() {
                     </div>
                 </div>
 
-                {/* Pro Insight Alert */}
+                {/* Commander's Insight */}
                 <div className="mt-12 p-8 rounded-[2.5rem] bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent border border-emerald-500/20 flex flex-col md:flex-row items-center gap-8">
                     <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
                         <AlertTriangle className="w-8 h-8 text-black" />
                     </div>
                     <div>
-                        <h4 className="text-xl font-black text-white mb-2">תובנת Commander: Claude 3.5 חווה עומס</h4>
+                        <h4 className="text-xl font-black text-white mb-2">תובנת מערכת: Claude 3.5 חווה עומס</h4>
                         <p className="text-white/50 font-medium leading-relaxed">
                             זיהינו עלייה של 15% ב-Latency בשרתי אירופה של Anthropic. אנחנו ממליצים להעביר Workflows קריטיים ל-GPT-4o ב-30 הדקות הקרובות כדי לשמור על רציפות.
                         </p>

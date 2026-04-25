@@ -74,7 +74,7 @@ const VendorInsights = () => {
           </div>
           <h1 className="text-5xl font-black italic tracking-tighter">AETHER INSIGHTS</h1>
           <p className="text-white/40 max-w-xl">
-            גישה לנתוני שוק בזמן אמת. הבן מה המשתמשים באמת מחפשים ואיפה נמצאים פערי השוק שהכלי שלך יכול למלא.
+            Real-time access to market data. Understand what users are actually searching for and where the market gaps are that your tool can fill.
           </p>
         </div>
 
@@ -161,7 +161,7 @@ const VendorInsights = () => {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <h3 className="text-2xl font-black italic text-cyan-400">MARKET GAPS: UNMET DEMAND</h3>
-                    <p className="text-white/40 text-sm">משתמשים מחפשים את הדברים האלו ולא מוצאים תוצאות רלוונטיות.</p>
+                    <p className="text-white/40 text-sm">Users are searching for these terms and found no relevant results in the vault.</p>
                   </div>
                   <Search className="w-8 h-8 text-cyan-400 opacity-50" />
                 </div>
@@ -192,7 +192,7 @@ const VendorInsights = () => {
                   <div className="space-y-4 text-center md:text-left">
                      <h3 className="text-3xl font-black italic tracking-tight uppercase">Strategic Posture</h3>
                      <p className="text-white/60 max-w-sm">
-                        מיקוד במענה על פערי החיפוש שזוהו יאפשר לכלי שלך להשיג יתרון משמעותי על פני המתחרים בשוק.
+                        Capitalizing on identified search gaps will allow your tool to gain a significant competitive advantage and capture untapped market share.
                      </p>
                   </div>
 
@@ -202,8 +202,8 @@ const VendorInsights = () => {
                         <span className="font-black italic">STRATEGY ADVISOR</span>
                      </div>
                      <p className="text-white/50 text-xs leading-relaxed max-w-[200px]">
-                        נראה שיש ביקוש גבוה ל "{insights.missed_searches[0]?.query_text || 'פיצ'רים חדשים'}". 
-                        שקול להוסיף יכולות אלו למוצר שלך כדי להרחיב את נתח השוק.
+                        It appears there is high demand for "{insights.missed_searches[0]?.query_text || 'new features'}". 
+                        Consider prioritizing these capabilities to expand your strategic footprint.
                      </p>
                   </div>
                </div>

@@ -1,10 +1,10 @@
 {
-  "welcome": "איזו עבודה תרצה שה-AI יבצע?",
-  "engine_tag": "✦ מנוע התאמה אדריכלי",
-  "search_placeholder": "לדוגמה: בניית אפליקציית React ו-Tailwind מאפס...",
-  "analyzing": "מנתח כוונת משתמש...",
-  "search_again": "חפש שוב",
-  "match_tool": "התאם לי כלי",
+  "welcome": "What job would you like AI to perform?",
+  "engine_tag": "ARCHITECTURAL MATCHING ENGINE ✦",
+  "search_placeholder": "...Example: Build a React and Tailwind app from scratch",
+  "analyzing": "Analyzing user intent...",
+  "search_again": "Search Again",
+  "match_tool": "Match tool for me",
   "found_results": "נמצאו {{count}} הכלים המדויקים ביותר לאינטנט שלך",
   "solving": "פותר את: {{intent}}",
   "no_summary": "אין תקציר זמין כרגע",
@@ -20,11 +20,11 @@
   "no_results_found": "לא מצאנו כלי שמתאים לכוונתך בדיוק. נסה לתאר זאת אחרת.",
   "abort_error": "עיבוד הנתונים המעמיק אורך זמן רב מהרגיל עקב עומס על מודלי הליבה. אנא נסה שוב בעוד רגע.",
   "generic_error": "מנוע ההכוונה חווה עומס רגעיי. המערכת תתאושש בקרוב.",
-  "prompts": {
-    "image": "יצירת תמונות מציאותיות וריאליסטיות",
-    "deck": "בניית מצגת משקיעים מתוך טקסט",
-    "debug": "דיבוג שגיאות עמוקות בשרת (Backend)"
-  },
+  "prompts": [
+    { "id": "image", "label": "יצירת תמונות מציאותיות וריאליסטיות", "intent": "Generative AI for photorealistic images and art" },
+    { "id": "deck", "label": "בניית מצגת משקיעים מתוך טקסט", "intent": "Create a professional investor pitch deck from raw text" },
+    { "id": "debug", "label": "דיבוג שגיאות עמוקות בשרת (Backend)", "intent": "Advanced backend debugging and code error analysis" }
+  ],
   "nav": {
     "how_it_works": "איך זה עובד",
     "use_cases": "תרחישים",
@@ -36,14 +36,20 @@
     "hello": "שלום,",
     "settings": "הגדרות חשבון",
     "settings_title": "הגדרות חשבון",
-    "logout": "התנתק"
+    "logout": "התנתק",
+    "admin": "פרוטוקול אדמין"
+  },
+  "branding": {
+    "title": "Aether",
+    "subtitle": "Compass",
+    "tagline": "נווט ה-AI האולטימטיבי"
   },
   "footer": {
     "product": "מוצר",
     "tool_index": "אינדקס כלים",
     "vault_live": "הכספת (Live Data)",
     "insiders": "Aether Insiders",
-    "pro": "Aether Pro",
+    "support": "תמיכה במיזם",
     "company": "חברה",
     "about": "אודות",
     "blog": "בלוג",
@@ -108,7 +114,7 @@
     "tab_profile": "פרופיל אישי",
     "tab_notifications": "התראות",
     "tab_security": "אבטחה",
-    "tab_billing": "ניהול מנוי",
+    "tab_support": "תמיכה ושותפות",
     "back_home": "חזרה",
     "profile_title": "פרטים אישיים",
     "full_name": "שם מלא",
@@ -131,10 +137,10 @@
     "security_info_desc": "אנו משתמשים ב-Magic Links או ספקי זהות (Google/GitHub) כדי לשמור על האבטחה המקסימלית של המידע שלך. אין סיסמאות שניתן לגנוב.",
     "login_history": "היסטוריית התחברויות",
     "login_history_desc": "צפה במכשירים שהתחברו לחשבון שלך",
-    "billing_title": "ניהול מנוי",
-    "current_plan": "תוכנית נוכחית",
-    "free_plan_desc": "גישה לחיפושים בסיסיים ושמירת כלים מוגבלת.",
-    "upgrade_btn": "שדרג ל-Pro",
+    "support_title": "תמיכה ושותפות (Patronage)",
+    "current_plan": "מעגל המפקדים (Commander's Circle)",
+    "support_desc": "Aether עובר למודל תמיכת קהילה. בזכות המעבר למנוע וקטורי מקומי (Zero-API), ביטלנו את התלות ב-API חיצוניים ושמרנו על הפרטיות שלכם. התמיכה שלכם מאפשרת לנו להחזיק את השרתים ולהמשיך לפתח את עתיד הניווט ב-AI.",
+    "support_btn": "תמיכה במיזם",
     "logout": "התנתקות"
   },
   "compare": {
@@ -172,5 +178,101 @@
     "cat_marketing": "שיווק ו-SEO",
     "cat_presentations": "מצגות משקיעים",
     "cat_enterprise": "כלים ארגוניים"
+  },
+  "about": {
+    "era_of_noise": "עידן של",
+    "algorithmic_noise": "רעש אלגוריתמי.",
+    "noise_subtitle": "האינטרנט מוצף באינדקסים שטחיים. תוצאות שנקנו בתקציבי שיווק, לא בזכות איכות.",
+    "core_disconnect": "הניתוק המרכזי",
+    "engineered_reality": "מציאות מהונדסת.",
+    "problem_subtitle": "כשמחפשים פתרון AI למשימה קריטית, התוצאות הראשונות הן לעיתים רחוקות הטובות ביותר. הן פשוט אלה עם תקציב ה-SEO הגדול ביותר.",
+    "aether_lab": "מעבדת Aether",
+    "objective_compass": "המצפן האובייקטיבי שלך.",
+    "solution_subtitle": "פיתחנו פנימית רשת אוטונומית של סוכנים המאתגרים את ההייפ השיווקי באמצעות ביקורות ביצועים מאומתות בשטח.",
+    "quality_promise": "הבטחת האיכות שלנו",
+    "three_pillars": "בנוי על שלושה עמודי תווך.",
+    "pillar_brand_title": "נטול פניות מותגיות",
+    "pillar_brand_desc": "דירוג האמון שלנו מנותק מהשפעה מסחרית. הוא מחושב באמצעות ביקורת קלינית ומתמטית בלבד.",
+    "pillar_field_title": "מאומת בשטח",
+    "pillar_field_desc": "הסוכנים שלנו מבצעים תרחישים מהעולם האמיתי כדי להבטיח שההבטחה השיווקית תואמת ליכולת בפועל בשטח.",
+    "pillar_intent_title": "ממוקד כוונה (Intent)",
+    "pillar_intent_desc": "חיפוש אדריכלי שמנתח את המטרה שלך (האינטנט), ומספק פתרונות מדויקים במקום התאמת מילות מפתח עיוורת.",
+    "zero_api_foundation": "הבסיס",
+    "zero_api_title": "פילוסופיית ה-Zero-API.",
+    "zero_api_subtitle": "פרטיות אינה תכונה; היא הבסיס. אנו מריצים מודלי ONNX ולוגיקה מקומית — לעולם לא שולחים את השאילתות שלך ל-API חיצוניים.",
+    "scout_tag": "רשת הסיירים",
+    "scout_title": "ביקורת אוטונומית.",
+    "scout_subtitle": "הסוכנים שלנו לא רק קוראים דוקומנטציה; הם בודקים קצוות, מאמתים תמחור ובודקים מגבלות נסתרות."
+  },
+  "live_monitor": {
+    "connecting": "מתחבר לניטור ביצועים בזמן אמת...",
+    "response_health": "מהירות תגובה ותקינות",
+    "last_received": "(נתקבל לאחרונה: {{time}})",
+    "update_pulse": "עדכן דופק מערכת",
+    "faster": "מהיר יותר",
+    "slower": "איטי יותר",
+    "reliability": "אמינות גישה",
+    "scanning": "סורק...",
+    "start_scan": "מתחיל סריקה...",
+    "scan_success": "סריקה הופעלה בהצלחה",
+    "scan_error": "שגיאה בהפעלת סריקה",
+    "connection_failed": "חיבור נכשל"
+  },
+  "not_found": {
+    "title": "404 - עמוד לא נמצא",
+    "subtitle": "הגעתם לאזור ריק מתובנות."
+  },
+  "no_insights": {
+    "title": "אין תוצאות למשימה זו"
+  },
+  "contact": {
+    "title": "צור קשר",
+    "subtitle": "יש לך מידע על כלי שפספסנו? רוצה לדווח על אי-דיוק בנתוני המעבדה שלנו? אנחנו כאן כדי להקשיב.",
+    "success_title": "הפנייה נשלחה בהצלחה",
+    "success_subtitle": "קיבלנו את ההודעה שלך. הצוות שלנו יבדוק אותה ויחזור אליך בהקדם האפשרי.",
+    "send_another": "שלח פנייה נוספת",
+    "full_name": "שם מלא",
+    "email": "אימייל לחזרה",
+    "subject": "נושא הפנייה",
+    "subject_suggestion": "הצעה לביקורת כלי",
+    "subject_inaccuracy": "דיווח על אי-דיוק בנתונים",
+    "subject_partnership": "שותפות עסקית / אקדמית",
+    "subject_other": "אחר",
+    "label_content": "תוכן ההודעה",
+    "placeholder_content": "פרט כאן את תוכן הפנייה בצורה הברורה ביותר...",
+    "fast_response": "אנחנו עונים קלינית מהר, בדרך כלל תוך שעות.",
+    "submit": "שלח פנייה"
+  },
+  "api_docs": {
+    "title_main": "Aether Vault API",
+    "title_sub": "/ רשימת המתנה",
+    "subtitle": "גישה ישירה למסד הנתונים הקליני של Aether. אנחנו פותחים גישה מוקדמת למפתחים שבונים יישומים מבוססי-המלצות אובייקטיביות, סוכני קנייה, ופלטפורמות מחקר.",
+    "tech_capabilities": "יכולות טכניות",
+    "rest_graphql": "שאילתות גמישות בכל מודלי הנתונים - עקומת למידה, תמחור סתרים, ודירוגי אמינות (Trust Score).",
+    "intent_engine": "עקיפת ה-API המסורתי לחיפוש טקסט חופשי. שלח מסר חופשי (Intent) וקבל מערך מסודר של כלים שעברו הערכת הצלחה מתמטית.",
+    "zero_bias": "מובטח בחוזה ה-SLA: אין קידום ממומן במענה ה-API האורגני. הנתונים תמיד נשארים טהורים וחסינים לקניית כוח.",
+    "success_title": "הבקשה נקלטה במערכת.",
+    "success_subtitle": "צוות האדריכלים שלנו יבחן את הפרטים, ונחזור אליך ברגע שנשחרר מפתחות API נוספים.",
+    "request_access": "בקש גישת API",
+    "limited_keys": "מספר המפתחות מוגבל מאוד בשלב הבטא הראשוני לצורך הבטחת יציבות השרתים.",
+    "email_label": "אימייל חברה / מפתח",
+    "use_case_label": "תרחיש שימוש מוצע",
+    "use_case_placeholder": "מה אתה בונה עם Aether?",
+    "submit": "שלח בקשה"
+  },
+  "admin": {
+    "analytics": {
+      "title": "אנליטיקות אינטנט",
+      "subtitle": "מה המשתמשים באמת מחפשים? נתונים בזמן אמת על כוונות החיפוש.",
+      "match_rate": "שיעור התאמה",
+      "total_searches": "סה\"כ חיפושים",
+      "recent_queries": "שאילתות אחרונות",
+      "col_query": "פרומפט / חיפוש",
+      "col_time": "זמן",
+      "col_status": "סטטוס",
+      "loading": "טוען נתונים...",
+      "no_data": "אין נתוני חיפוש עדיין.",
+      "error_fetch": "שגיאה בטעינת אנליטיקות."
+    }
   }
 }

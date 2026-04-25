@@ -4,10 +4,10 @@ import { Cpu, Search, Sparkles, Database } from 'lucide-react';
 const PremiumSearchSkeleton = () => {
     const [statusIndex, setStatusIndex] = useState(0);
     const statuses = [
-        "מנוע הכוונה מנתח את הבקשה מול עשרות מודלים...",
-        "מבצע הצלבת נתונים מול ה-Vault בזמן אמת...",
-        "מחשב מדדי התאמה (Alignment) ודירוגי ביצועים...",
-        "מזקק את 3 הכלים האופטימליים עבורך...",
+        "Architecting matching results based on user intent...",
+        "Cross-referencing Vault data for verified performance...",
+        "Calculating alignment and trust-score weights...",
+        "Finalizing top 3 architectural matches...",
     ];
 
     useEffect(() => {

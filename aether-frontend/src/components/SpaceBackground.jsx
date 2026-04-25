@@ -3,40 +3,37 @@ import React from 'react';
 export default function SpaceBackground() {
     return (
         <div className="fixed inset-0 w-screen h-screen pointer-events-none -z-10 bg-[#02050a] overflow-hidden">
-            {/* Enhanced Nebula Glows (Slightly more vivid and expansive) */}
-            <div className="absolute top-[5%] left-[10%] w-[40vw] h-[40vw] rounded-full bg-cyan-500/10 blur-[130px] mix-blend-screen animate-pulse duration-[8000ms]" />
-            <div className="absolute bottom-[10%] right-[5%] w-[50vw] h-[50vw] rounded-full bg-emerald-500/10 blur-[160px] mix-blend-screen animate-pulse duration-[10000ms]" />
-            <div className="absolute top-[40%] left-[60%] w-[30vw] h-[30vw] rounded-full bg-blue-600/5 blur-[120px] mix-blend-screen" />
+            {/* 1. Deep Atmospheric Glows (The 'Premium' Layer) */}
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-cyan-500/10 blur-[120px] rounded-full animate-atmospheric" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/10 blur-[150px] rounded-full animate-atmospheric [animation-delay:-5s]" />
+            <div className="absolute top-[20%] right-[10%] w-[40%] h-[40%] bg-emerald-500/5 blur-[100px] rounded-full animate-atmospheric [animation-delay:-12s]" />
 
-            {/* Enhanced Minimalist Twinkling Starfield */}
-            <div className="absolute inset-0 opacity-[0.35]">
+            {/* 2. Layered Twinkling Starfield */}
+            <div className="absolute inset-0 opacity-[0.4]">
                 <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                     <defs>
-                        <pattern id="star-pattern-1" width="100" height="100" patternUnits="userSpaceOnUse">
-                            <circle cx="15" cy="20" r="1.5" fill="#ffffff" opacity="0.8" />
-                            <circle cx="60" cy="40" r="1.8" fill="#cffafe" opacity="0.4" />
-                            <circle cx="45" cy="85" r="1.0" fill="#ffffff" opacity="0.6" />
-                            <circle cx="90" cy="10" r="2.2" fill="#ffffff" opacity="0.3" />
-                            <circle cx="25" cy="70" r="0.8" fill="#bae6fd" opacity="0.5" />
+                        <pattern id="star-pattern-rich-1" width="100" height="100" patternUnits="userSpaceOnUse">
+                            <circle cx="15" cy="20" r="0.8" fill="#ffffff" opacity="0.8" />
+                            <circle cx="85" cy="15" r="0.5" fill="#ffffff" opacity="0.4" />
+                            <circle cx="60" cy="40" r="1.1" fill="#ffffff" opacity="0.6" />
+                            <circle cx="25" cy="75" r="0.6" fill="#ffffff" opacity="0.3" />
+                            <circle cx="70" cy="85" r="0.9" fill="#ffffff" opacity="0.5" />
                         </pattern>
-                        <pattern id="star-pattern-2" width="150" height="150" patternUnits="userSpaceOnUse">
-                            <circle cx="20" cy="110" r="1.2" fill="#ffffff" opacity="0.7" />
-                            <circle cx="120" cy="65" r="2.5" fill="#bae6fd" opacity="0.5" />
-                            <circle cx="75" cy="25" r="0.8" fill="#ffffff" opacity="0.9" />
-                            <circle cx="140" cy="130" r="1.8" fill="#ffffff" opacity="0.4" />
-                            <circle cx="95" cy="100" r="1.0" fill="#ccfbf1" opacity="0.6" />
-                        </pattern>
-                        <pattern id="star-pattern-3" width="250" height="250" patternUnits="userSpaceOnUse">
-                            <circle cx="50" cy="50" r="2.0" fill="#ffffff" opacity="0.3" />
-                            <circle cx="180" cy="190" r="1.5" fill="#a5f3fc" opacity="0.4" />
-                            <circle cx="220" cy="30" r="1.0" fill="#ffffff" opacity="0.8" />
+                        <pattern id="star-pattern-rich-2" width="200" height="200" patternUnits="userSpaceOnUse">
+                            <circle cx="40" cy="150" r="0.7" fill="#ffffff" opacity="0.4" />
+                            <circle cx="160" cy="50" r="1.2" fill="#ffffff" opacity="0.6" />
+                            <circle cx="100" cy="100" r="0.5" fill="#ffffff" opacity="0.3" />
+                            <circle cx="180" cy="180" r="0.8" fill="#ffffff" opacity="0.5" />
                         </pattern>
                     </defs>
-                    <rect width="100%" height="100%" fill="url(#star-pattern-1)" />
-                    <rect width="100%" height="100%" fill="url(#star-pattern-2)" />
-                    <rect width="100%" height="100%" fill="url(#star-pattern-3)" />
+                    <rect width="100%" height="100%" fill="url(#star-pattern-rich-1)" />
+                    <rect width="100%" height="100%" fill="url(#star-pattern-rich-2)" />
                 </svg>
             </div>
+            
+            {/* 3. Global Vignette for Depth */}
+            <div className="absolute inset-0 bg-gradient-radial from-transparent via-[#02050a]/40 to-[#02050a] pointer-events-none" />
         </div>
     );
 }
+

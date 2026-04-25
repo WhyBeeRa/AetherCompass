@@ -45,8 +45,12 @@ origins = [
     "http://www.aethercompass.com",
     "http://aethercompass.com",
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:80",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 # 3. הזרקת ה-Middleware
@@ -79,6 +83,11 @@ pipeline = AetherPipeline()
 # Initialize Vault (Persistence Layer)
 from persistence import AetherVault
 vault = AetherVault()
+db_ok = True
+try:
+    vault.get_stats()
+except Exception:
+    db_ok = False
 
 # Initialize Local Embedding Engine (singleton — loads model once into ~130MB RAM)
 from local_embedder import LocalEmbeddingEngine
@@ -91,6 +100,12 @@ search_engine = AetherSearchEngine(embedder, vault)
 @app.on_event("startup")
 async def startup_event():
     print("Initializing Aether Backend...")
+    
+    # [Liveliness Indicator] Signal kernel status to the terminal
+    log_path = Path(__file__).parent / "background_tasks.log"
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(f"\n[{datetime.now()}] [SYSTEM] Aether Kernel Online - Command Center Linked\n")
+
     initialize_firebase_admin()
     seed_file = Path(__file__).parent / "seed_data.json"
     
@@ -117,7 +132,6 @@ async def startup_event():
                 job_to_be_done = [intent.get("intent_description", "") for intent in intents_mapped if intent.get("intent_description")]
                 
                 if existing_tool:
-                    print(f"Tool {tool_name} already in Vault. Skipping seed overwrite to preserve original data.")
                     continue
                 
                 # Create default metrics for seeding
@@ -464,9 +478,10 @@ def get_analytics(admin_email: str = Depends(verify_admin_user)):
     """
     return vault.get_search_analytics(limit=100)
 
-@app.get("/admin/pending", dependencies=[Depends(verify_admin_user)])
-def get_pending_tools():
-    return vault.get_pending_tools()
+@app.get("/admin/requests", dependencies=[Depends(verify_admin_user)])
+def get_requests():
+    tools = vault.get_pending_tools()
+    return {"requests": tools}
 
 @app.post("/admin/approve", dependencies=[Depends(verify_admin_user)])
 def approve_tool(tool_name: str):
@@ -517,6 +532,10 @@ async def search_intent(q: str):
         # Log search for analytics (Phase 5)
         vault.log_search(q, has_match=len(results) > 0)
         return results
+    except RuntimeError as re:
+        if str(re) == "System initializing":
+            raise HTTPException(status_code=503, detail="System initializing")
+        raise HTTPException(status_code=500, detail=str(re))
     except Exception as e:
         print(f"[API Error] /search/intent failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -768,10 +787,10 @@ def get_live_benchmarks():
     """
     return vault.get_latest_benchmarks()
 
-@app.post("/benchmarks/trigger")
-async def trigger_live_benchmark(background_tasks: BackgroundTasks):
+@app.post("/admin/live-metrics/trigger", dependencies=[Depends(verify_admin_user)])
+async def trigger_live_benchmark(background_tasks: BackgroundTasks, admin_email: str = Depends(verify_admin_user)):
     """
-    Manually triggers a live benchmark cycle. Available to all users.
+    Manually triggers a live benchmark cycle. Admin only.
     """
     from live_benchmarking import LiveMonitor
     monitor = LiveMonitor(vault)
@@ -805,6 +824,75 @@ async def trigger_autonomous_discovery(background_tasks: BackgroundTasks, admin_
 
     background_tasks.add_task(discovery_task)
     return {"status": "success", "message": "Autonomous scouting cycle triggered in background."}
+
+# --- Phase 10: System Pulse & Diagnostics ---
+
+@app.get("/admin/heartbeat", dependencies=[Depends(verify_admin_user)])
+async def get_system_heartbeat(admin_email: str = Depends(verify_admin_user)):
+    """
+    Returns the 'Health Status' of the Aether Backend.
+    """
+    # Check Embedder Status
+    embedder_status = "UNKNOWN"
+    memory_usage = 0
+    
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        memory_usage = round(process.memory_info().rss / 1024 / 1024, 2)
+    except Exception:
+        memory_usage = -1 # N/A indicator
+    
+    try:
+        from local_embedder import LocalEmbeddingEngine
+        eng = LocalEmbeddingEngine.get_instance()
+        if eng.is_ready():
+            embedder_status = "ACTIVE"
+        else:
+            # Check if model files exist in cache
+            cache_dir = Path(eng.CACHE_DIR)
+            model_exists = (cache_dir / "models--BAAI--bge-small-en-v1.5").exists()
+            embedder_status = "LOADING" if model_exists else "MISSING_MODEL"
+    except Exception as e:
+        print(f"[Heartbeat] Embedder check failed: {e}")
+        embedder_status = "ERROR"
+
+    # Dynamic DB check
+    current_db_status = "DISCONNECTED"
+    try:
+        vault.get_stats()
+        current_db_status = "CONNECTED"
+    except Exception:
+        current_db_status = "ERROR"
+
+    return {
+        "status": "online",
+        "timestamp": datetime.now().isoformat(),
+        "memory_usage_mb": memory_usage if memory_usage >= 0 else "N/A",
+        "embedder_status": embedder_status,
+        "database_status": current_db_status,
+        "admin_identity": admin_email
+    }
+
+@app.get("/admin/logs", dependencies=[Depends(verify_admin_user)])
+def get_admin_logs(lines: int = 50, log_type: str = "tasks", admin_email: str = Depends(verify_admin_user)):
+    """
+    Returns the last N lines of the requested log file.
+    """
+    log_file = "background_tasks.log" if log_type == "tasks" else "error.log"
+    log_path = Path(__file__).parent / log_file
+    
+    if not log_path.exists():
+        return {"error": f"Log file {log_file} not found"}
+        
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            # Simple tail implementation
+            content = f.readlines()
+            last_lines = content[-lines:] if len(content) > lines else content
+            return {"log_type": log_type, "lines": last_lines}
+    except Exception as e:
+        return {"error": str(e)}
 
 # --- Phase 9: Gemma Local Worker Batch Upload ---
 

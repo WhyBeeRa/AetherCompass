@@ -128,6 +128,7 @@ class LiveMonitor:
 
         # 1. LATENCY CHECK
         latency = None
+        status = "offline"
         
         # Specilized Real Pings
         if "gemini" in name.lower():
@@ -139,11 +140,14 @@ class LiveMonitor:
                 # We use a simple get request to the website as a proxy for 'Life' and latency
                 resp = await self.client.get(website, timeout=5.0)
                 latency = (time.time() - start_time) * 1000
-                if resp.status_code >= 400:
-                     status = "slow" if latency > 1500 else "online" 
+                
+                if resp.status_code == 403 or resp.status_code == 429:
+                    status = "protected"
+                elif resp.status_code >= 400:
+                    status = "slow" if latency > 1500 else "online" 
                 else:
-                     status = "online" if latency < 1200 else "slow"
-            except Exception:
+                    status = "online" if latency < 1200 else "slow"
+            except (httpx.ConnectError, httpx.TimeoutException):
                 return LiveMetric(
                     tool_name=name,
                     provider="Web",
@@ -151,29 +155,40 @@ class LiveMonitor:
                     hallucination_score=0,
                     status="offline"
                 )
+            except Exception as e:
+                print(f"[LiveMonitor] Unexpected error measuring {name}: {e}")
+                status = "offline"
         else:
             status = "online" if latency < 1500 else "slow"
 
-        # 2. HALLUCINATION / ACCURACY (Heuristic for now)
-        base_accuracy = 95.0
-        if status == "slow": base_accuracy -= 5.0
-        if status == "offline": base_accuracy = 0
-        
-        hallucination_score = round(base_accuracy + random.uniform(-2, 4), 2)
-        hallucination_score = max(0, min(100, hallucination_score))
+        # 2. ACCESS RELIABILITY (Formerly Hallucination Score)
+        # 100% = Perfect uptime/unblocked. 0% = Offline.
+        if status == "online":
+            base_score = 99.0 - (latency / 500.0) # Minor penalty for every 500ms
+        elif status == "protected":
+            base_score = 99.5 # High reliability but cloaked
+        elif status == "slow":
+            base_score = 85.0 - (latency / 1000.0)
+        else:
+            base_score = 0
+            
+        access_reliability = round(base_score + random.uniform(-0.5, 0.5), 2)
+        access_reliability = max(0, min(100, access_reliability))
 
         provider = "AI Provider"
-        if any(kw in name.lower() for kw in ["gpt", "openai"]): provider = "OpenAI"
-        elif "claude" in name.lower(): provider = "Anthropic"
-        elif "gemini" in name.lower(): provider = "Google"
-        elif "perplexity" in name.lower(): provider = "Perplexity"
-        elif "llama" in name.lower(): provider = "Meta"
+        name_lower = name.lower()
+        if any(kw in name_lower for kw in ["gpt", "openai"]): provider = "OpenAI"
+        elif "claude" in name_lower: provider = "Anthropic"
+        elif "gemini" in name_lower: provider = "Google"
+        elif "perplexity" in name_lower: provider = "Perplexity"
+        elif "llama" in name_lower: provider = "Meta"
+        elif "mistral" in name_lower: provider = "Mistral"
 
         return LiveMetric(
             tool_name=name,
             provider=provider,
-            latency_ms=round(latency, 2),
-            hallucination_score=hallucination_score,
+            latency_ms=round(latency or 0, 2),
+            hallucination_score=access_reliability, # Reusing field for Access Reliability
             timestamp=datetime.now(),
             status=status
         )
@@ -216,8 +231,8 @@ class LiveMonitor:
                 m.comparison_vs_avg = 0
                 
             self.vault.save_live_metric(m)
-            status_symbol = "[OK]" if m.status == "online" else "[SLOW]" if m.status == "slow" else "[OFFLINE]"
-            print(f"  {status_symbol} {m.tool_name} ({m.provider}): {m.latency_ms}ms | Hallucination Index: {m.hallucination_score} | {m.comparison_vs_avg}% vs avg")
+            status_symbol = "[OK]" if m.status == "online" else "[SLOW]" if m.status == "slow" else "[PROTECTED]" if m.status == "protected" else "[OFFLINE]"
+            print(f"  {status_symbol} {m.tool_name} ({m.provider}): {m.latency_ms}ms | Access Reliability: {m.hallucination_score} | {m.comparison_vs_avg}% vs avg")
 
         print(f"[{datetime.now()}] Benchmark Cycle Complete. {len(metrics)} tools updated.")
         await self.client.aclose()

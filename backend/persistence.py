@@ -11,6 +11,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "vault.db"
 
+
 class AetherVault:
     """
     The Memory Layer.
@@ -19,11 +20,18 @@ class AetherVault:
     def __init__(self):
         self._init_db()
 
+    def _get_conn(self):
+        """
+        Returns a thread-safe connection to the SQLite database.
+        check_same_thread=False is essential for FastAPI's async/threading model.
+        """
+        return sqlite3.connect(DB_PATH, check_same_thread=False)
+
     def _init_db(self):
         """
         Initialize the SQLite database schema.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         
         # 1. Verified Tools (The Core Truth)
@@ -102,15 +110,9 @@ class AetherVault:
                         badges_json TEXT DEFAULT '[]',
                         contributions_count INTEGER DEFAULT 0,
                         votes_count INTEGER DEFAULT 0,
-                        last_active TIMESTAMP,
-                        is_pro INTEGER DEFAULT 0
+                        last_active TIMESTAMP
                     )''')
 
-        # Migration: Add is_pro column to users if it doesn't exist
-        try:
-             c.execute("ALTER TABLE users ADD COLUMN is_pro INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-             pass # Column already exists
 
         # 6. Elo Battles History
         c.execute('''CREATE TABLE IF NOT EXISTS elo_battles (
@@ -150,7 +152,7 @@ class AetherVault:
         Saves a fully verified tool to the Vault.
         `embedding` should be raw bytes from numpy ndarray.tobytes() (float32, 384 dims).
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         
         timestamp = datetime.now()
@@ -206,7 +208,7 @@ class AetherVault:
         """
         Deletes a tool and all related data from the Vault.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         
         tool_name_lower = tool_name.lower()
@@ -229,7 +231,7 @@ class AetherVault:
         Updates only the binary embedding for a specific tool.
         `embedding_bytes` should be raw bytes from numpy ndarray.tobytes().
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         
         c.execute("UPDATE verified_tools SET embedding_blob = ? WHERE tool_name = ?", (embedding_bytes, tool_name.lower()))
@@ -244,7 +246,7 @@ class AetherVault:
         Returns list of (tool_name, trust_score, embedding_vector, analysis_dict).
         Reconstructs numpy arrays from binary BLOB using np.frombuffer.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
@@ -254,17 +256,19 @@ class AetherVault:
         
         results = []
         for row in rows:
-            blob = row['embedding_blob']
+            row_dict = dict(row)
+            blob = row_dict['embedding_blob']
             if not blob:
                 continue  # Skip tools without embeddings
             
             # CRITICAL: Reconstruct numpy array from raw bytes
             vector = np.frombuffer(blob, dtype=np.float32)
-            analysis = json.loads(row['analysis_json']) if row['analysis_json'] else {}
+            analysis_json = row_dict['analysis_json']
+            analysis = json.loads(analysis_json) if analysis_json else {}
             
             results.append((
-                row['tool_name'],
-                row['trust_score'],
+                row_dict['tool_name'],
+                row_dict['trust_score'],
                 vector,
                 analysis
             ))
@@ -276,7 +280,7 @@ class AetherVault:
         Retrieves a tool from the Vault.
         Can query by exact tool_name or slugified id.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
@@ -306,24 +310,27 @@ class AetherVault:
         if not row:
             return None
             
+        row_dict = dict(row)
+            
         # Expiration Logic (90 Days - Extended for better UX / development)
-        last_updated = datetime.fromisoformat(str(row['last_updated']))
+        last_updated = datetime.fromisoformat(str(row_dict['last_updated']))
         if datetime.now() - last_updated > timedelta(days=90):
             if include_expired:
-                print(f"[Vault] Tool '{row['tool_name']}' is EXPIRED but returning anyway due to override.")
+                print(f"[Vault] Tool '{row_dict['tool_name']}' is EXPIRED but returning anyway due to override.")
             else:
-                print(f"[Vault] Tool '{row['tool_name']}' found but EXPIRED. Triggering Pulse Check.")
+                print(f"[Vault] Tool '{row_dict['tool_name']}' found but EXPIRED. Triggering Pulse Check.")
                 return None # Treat as not found to trigger re-verification
             
         # Reconstruct Data
-        slug_id = row['tool_name'].strip().lower().replace(' ', '-')
+        tool_name = row_dict['tool_name']
+        slug_id = tool_name.strip().lower().replace(' ', '-')
         return {
             "id": slug_id,
-            "tool_name": row['tool_name'],
-            "last_updated": row['last_updated'],
-            "trust_score": row['trust_score'],
-            "analysis": json.loads(row['analysis_json']),
-            "is_active": bool(row['is_active']),
+            "tool_name": tool_name,
+            "last_updated": row_dict['last_updated'],
+            "trust_score": row_dict['trust_score'],
+            "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {},
+            "is_active": bool(row_dict['is_active']),
             "status": "success" # Implicitly success if in DB
         }
 
@@ -331,7 +338,7 @@ class AetherVault:
         """
         Searches the Vault for tools matching the query (Intent or Name).
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
@@ -354,20 +361,22 @@ class AetherVault:
         
         results = []
         for row in rows:
-            slug_id = row['tool_name'].strip().lower().replace(' ', '-')
+            row_dict = dict(row)
+            tool_name = row_dict['tool_name']
+            slug_id = tool_name.strip().lower().replace(' ', '-')
             results.append({
                 "id": slug_id,
-                "tool_name": row['tool_name'],
-                "trust_score": row['trust_score'],
-                "analysis": json.loads(row['analysis_json']),
-                "gallery": json.loads(row['gallery_json']),
-                "is_active": bool(row['is_active']),
+                "tool_name": tool_name,
+                "trust_score": row_dict['trust_score'],
+                "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {},
+                "gallery": json.loads(row_dict['gallery_json']) if row_dict['gallery_json'] else [],
+                "is_active": bool(row_dict['is_active']),
             })
             
         return results
 
     def get_stats(self) -> Dict:
-         conn = sqlite3.connect(DB_PATH)
+         conn = self._get_conn()
          c = conn.cursor()
          
          # count
@@ -410,7 +419,7 @@ class AetherVault:
 
     def log_search(self, query_text: str, has_match: bool):
         """Logs a search query to the database."""
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         c.execute("INSERT INTO search_queries (query_text, timestamp, has_match) VALUES (?, ?, ?)",
                   (query_text, datetime.now(), 1 if has_match else 0))
@@ -419,7 +428,7 @@ class AetherVault:
 
     def get_search_analytics(self, limit: int = 50) -> List[Dict]:
         """Fetches the latest search queries for the admin dashboard."""
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("SELECT * FROM search_queries ORDER BY timestamp DESC LIMIT ?", (limit,))
@@ -428,7 +437,7 @@ class AetherVault:
         return [dict(r) for r in rows]
 
     def update_tool_status(self, tool_name: str, status: int):
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         c.execute("UPDATE verified_tools SET is_active = ? WHERE tool_name = ?", (status, tool_name.lower()))
         conn.commit()
@@ -439,7 +448,7 @@ class AetherVault:
         self.update_tool_status(tool_name, 1 if active else 0)
 
     def create_scout_task(self, tool_name: str, url: str, email: str) -> int:
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         now = datetime.now()
         c.execute("INSERT INTO scout_tasks (tool_name, url, submitter_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
@@ -450,7 +459,7 @@ class AetherVault:
         return task_id
 
     def update_scout_task(self, task_id: int, status: str, error_message: str = None, final_tool_name: str = None):
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         if final_tool_name:
             c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ?, tool_name = ? WHERE task_id = ?",
@@ -462,7 +471,7 @@ class AetherVault:
         conn.close()
 
     def get_live_scans(self) -> List[Dict]:
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         # Keep only recent tasks or non-completed ones
@@ -475,7 +484,7 @@ class AetherVault:
         """
         Fetches all tools that are currently hidden (is_active = 0) for admin review.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("""SELECT tool_name, last_updated, trust_score, analysis_json, is_active 
@@ -487,19 +496,21 @@ class AetherVault:
         
         results = []
         for row in rows:
-            slug_id = row['tool_name'].strip().lower().replace(' ', '-')
+            row_dict = dict(row)
+            tool_name = row_dict['tool_name']
+            slug_id = tool_name.strip().lower().replace(' ', '-')
             results.append({
                 "id": slug_id,
-                "tool_name": row['tool_name'],
-                "trust_score": row['trust_score'],
-                "analysis": json.loads(row['analysis_json']),
-                "last_updated": row['last_updated']
+                "tool_name": tool_name,
+                "trust_score": row_dict['trust_score'],
+                "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {},
+                "last_updated": row_dict['last_updated']
             })
         return results
 
     def quick_update_pricing(self, tool_name: str, new_pricing: str):
         """Quickly updates the pricing model of a tool."""
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         
         # We need to update analysis_json to persist the pricing change
@@ -512,12 +523,11 @@ class AetherVault:
             conn.commit()
         
         conn.close()
-        print(f"[Vault] Tool '{tool_name}' pricing updated to: {new_pricing}")
 
     # --- Phase 6: Community & Elo Implementation ---
 
     def get_or_create_user(self, uid: str, email: str, display_name: Optional[str] = None) -> UserProfile:
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
@@ -535,37 +545,36 @@ class AetherVault:
                 contributions_count=row['contributions_count'],
                 votes_count=row['votes_count'],
                 last_active=datetime.fromisoformat(row['last_active']) if row['last_active'] else datetime.now(),
-                is_pro=bool(row['is_pro']) if 'is_pro' in row.keys() else False
             )
             # Update last active
             c.execute("UPDATE users SET last_active = ? WHERE uid = ?", (datetime.now(), uid))
             conn.commit()
         else:
             user = UserProfile(uid=uid, email=email, display_name=display_name)
-            c.execute('''INSERT INTO users (uid, email, display_name, points, elo, badges_json, last_active, is_pro)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                      (uid, email, display_name, user.points, user.elo, json.dumps(user.badges), user.last_active, 1 if user.is_pro else 0))
+            c.execute('''INSERT INTO users (uid, email, display_name, points, elo, badges_json, last_active)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                      (uid, email, display_name, user.points, user.elo, json.dumps(user.badges), user.last_active))
             conn.commit()
             
         conn.close()
         return user
 
     def update_user(self, user: UserProfile):
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         c.execute('''UPDATE users SET 
                      display_name = ?, points = ?, elo = ?, badges_json = ?, 
-                     contributions_count = ?, votes_count = ?, last_active = ?, is_pro = ?
+                     contributions_count = ?, votes_count = ?, last_active = ?
                      WHERE uid = ?''',
                   (user.display_name, user.points, user.elo, json.dumps(user.badges), 
-                   user.contributions_count, user.votes_count, datetime.now(), 1 if user.is_pro else 0, user.uid))
+                   user.contributions_count, user.votes_count, datetime.now(), user.uid))
         conn.commit()
         conn.close()
 
 
 
     def get_user_rankings(self, limit: int = 10) -> List[Dict]:
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         c.execute("SELECT display_name, email, points, elo, badges_json FROM users ORDER BY points DESC LIMIT ?", (limit,))
@@ -581,7 +590,7 @@ class AetherVault:
         """
         Gathers intelligence for a specific tool vendor.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         
@@ -612,7 +621,7 @@ class AetherVault:
         """
         Saves a live performance metric.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         c = conn.cursor()
         c.execute('''INSERT INTO live_metrics 
                      (tool_name, provider, latency_ms, hallucination_score, timestamp, status, comparison_vs_avg)
@@ -626,7 +635,7 @@ class AetherVault:
         """
         Fetches the latest live benchmarks for each major provider.
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
         # Get the latest entry for each tool_name

@@ -26,32 +26,27 @@ export default function UseCases() {
     }, []);
 
     const categories = [
-        { id: 'dev', name: t('use_cases.cat_dev'), hebrewName: 'פיתוח קוד', icon: Code, count: counts['dev'] || 0, color: 'text-blue-500', bg: 'bg-blue-50' },
-        { id: 'design', name: t('use_cases.cat_design'), hebrewName: 'יצירת תמונות ועיצוב', icon: ImageIcon, count: counts['design'] || 0, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50' },
-        { id: 'text', name: t('use_cases.cat_text'), hebrewName: 'כתיבה וטקסט', icon: FileText, count: counts['text'] || 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-        { id: 'video', name: t('use_cases.cat_video'), hebrewName: 'עריכת וידאו', icon: Video, count: counts['video'] || 0, color: 'text-amber-500', bg: 'bg-amber-50' },
-        { id: 'audio', name: t('use_cases.cat_audio'), hebrewName: 'דיבוב ושמע', icon: Mic, count: counts['audio'] || 0, color: 'text-violet-500', bg: 'bg-violet-50' },
-        { id: 'marketing', name: t('use_cases.cat_marketing'), hebrewName: 'שיווק ו-SEO', icon: TrendingUp, count: counts['marketing'] || 0, color: 'text-cyan-500', bg: 'bg-cyan-50' },
-        { id: 'presentations', name: t('use_cases.cat_presentations'), hebrewName: 'מצגות משקיעים', icon: Presentation, count: counts['presentations'] || 0, color: 'text-rose-500', bg: 'bg-rose-50' },
-        { id: 'enterprise', name: t('use_cases.cat_enterprise'), hebrewName: 'כלים ארגוניים', icon: Building2, count: counts['enterprise'] || 0, color: 'text-white/60', bg: 'bg-white/10 backdrop-blur-md' },
+        { id: 'dev', name: t('use_cases.cat_dev'), icon: Code, count: counts['dev'] || 0, color: 'text-blue-500', bg: 'bg-blue-50' },
+        { id: 'design', name: t('use_cases.cat_design'), icon: ImageIcon, count: counts['design'] || 0, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50' },
+        { id: 'text', name: t('use_cases.cat_text'), icon: FileText, count: counts['text'] || 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+        { id: 'video', name: t('use_cases.cat_video'), icon: Video, count: counts['video'] || 0, color: 'text-amber-500', bg: 'bg-amber-50' },
+        { id: 'audio', name: t('use_cases.cat_audio'), icon: Mic, count: counts['audio'] || 0, color: 'text-violet-500', bg: 'bg-violet-50' },
+        { id: 'marketing', name: t('use_cases.cat_marketing'), icon: TrendingUp, count: counts['marketing'] || 0, color: 'text-cyan-500', bg: 'bg-cyan-50' },
+        { id: 'presentations', name: t('use_cases.cat_presentations'), icon: Presentation, count: counts['presentations'] || 0, color: 'text-rose-500', bg: 'bg-rose-50' },
+        { id: 'enterprise', name: t('use_cases.cat_enterprise'), icon: Building2, count: counts['enterprise'] || 0, color: 'text-white/60', bg: 'bg-white/10 backdrop-blur-md' },
     ];
 
     const filteredCategories = categories.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.hebrewName.toLowerCase().includes(searchQuery.toLowerCase())
+        c.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     // When navigating to vault, pass the Hebrew name so the Vault's category filter works
     const handleCategoryClick = (category) => {
-        // Use Hebrew name for vault filter compatibility (vault categoryKeywords uses Hebrew keys)
-        const filterName = i18n.language === 'he' ? category.name : category.hebrewName;
-        navigate(`/vault?q=${encodeURIComponent(filterName)}`);
+        navigate(`/vault?q=${encodeURIComponent(category.name)}`);
     };
 
-    const dir = i18n.dir();
-
     return (
-        <div className="flex flex-col w-full min-h-[85vh] animate-in fade-in duration-700" dir={dir}>
+        <div className="flex flex-col w-full min-h-[85vh] animate-in fade-in duration-700" dir="ltr">
 
             {/* Header Content */}
             <div className="w-full flex flex-col items-center text-center mb-12">
@@ -68,13 +63,13 @@ export default function UseCases() {
 
             {/* Smart Search Bar */}
             <div className="w-full max-w-2xl mx-auto relative mb-12">
-                <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 w-5 h-5 text-white/50`} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
                 <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t('use_cases.search_placeholder')}
-                    className={`w-full bg-white/5 backdrop-blur-md border border-white/20 rounded-2xl ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-4 text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-white/20 transition-all shadow-sm text-lg`}
+                    className="w-full bg-white/5 backdrop-blur-md border border-white/20 rounded-2xl pl-12 pr-4 py-4 text-white focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-white/20 transition-all shadow-sm text-lg"
                 />
             </div>
 
@@ -86,7 +81,7 @@ export default function UseCases() {
                         <div
                             key={category.id}
                             onClick={() => handleCategoryClick(category)}
-                            className={`group flex flex-col p-6 bg-white/5 backdrop-blur-md border border-white/20 rounded-3xl hover:border-white/20 transition-all hover:shadow-lg cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'} relative overflow-hidden`}
+                            className="group flex flex-col p-6 bg-white/5 backdrop-blur-md border border-white/20 rounded-3xl hover:border-white/20 transition-all hover:shadow-lg cursor-pointer text-left relative overflow-hidden"
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${category.bg} ${category.color} transition-transform group-hover:scale-110`}>

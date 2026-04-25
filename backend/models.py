@@ -270,7 +270,7 @@ class UserProfile(BaseModel):
     contributions_count: int = 0
     votes_count: int = 0
     last_active: datetime = Field(default_factory=datetime.now)
-    is_pro: bool = False
+
 
 class VendorInsights(BaseModel):
     tool_name: str

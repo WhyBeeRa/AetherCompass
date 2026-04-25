@@ -41,7 +41,7 @@ export default function Activation() {
     }, []);
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[85vh] w-full rtl" dir="rtl">
+        <div className="flex flex-col items-center justify-center min-h-[85vh] w-full ltr" dir="ltr">
 
             {/* Nav Back */}
             <div className="w-full max-w-md flex justify-start mb-6">
@@ -49,7 +49,7 @@ export default function Activation() {
                     onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-white/60 hover:text-white transition-colors text-sm font-medium"
                 >
-                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowLeft className="w-4 h-4 rotate-180" />
                     {t('activation.back_home')}
                 </button>
             </div>
@@ -105,7 +105,7 @@ export default function Activation() {
                         {/* Magic Link Form */}
                         <form onSubmit={handleMagicLink} className="flex flex-col gap-3">
                             <div className="relative">
-                                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                                     <Mail className="w-5 h-5 text-white/50" />
                                 </div>
                                 <input
@@ -113,7 +113,7 @@ export default function Activation() {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="your@email.com"
-                                    className="w-full bg-white/5 backdrop-blur-md border border-white/20 text-white rounded-xl pr-10 pl-4 py-3 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-white/20 transition-all"
+                                    className="w-full bg-white/5 backdrop-blur-md border border-white/20 text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-white/20 transition-all"
                                     required
                                     dir="ltr"
                                 />
@@ -156,7 +156,7 @@ export default function Activation() {
 
             {/* Footer Terms */}
             <p className="text-xs text-white/50 mt-8 text-center max-w-sm">
-                {t('activation.terms_prefix')}<a href="/terms" className="underline hover:text-white/80">{t('activation.terms_link')}</a> {t('activation.and')}<a href="/privacy" className="underline hover:text-white/80">{t('activation.privacy_link')}</a>{i18n && i18n.language === 'he' ? ' שלנו.' : '.'}
+                {t('activation.terms_prefix')}<a href="/terms" className="underline hover:text-white/80">{t('activation.terms_link')}</a> {t('activation.and')}<a href="/privacy" className="underline hover:text-white/80">{t('activation.privacy_link')}</a>.
             </p>
         </div>
     );

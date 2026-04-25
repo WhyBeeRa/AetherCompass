@@ -122,13 +122,12 @@ const Vault = ({ setAppError }) => {
 
             if (!res.ok) {
                 const errorData = await res.json();
-                throw new Error(errorData.detail || "Deletion failed");
+                throw new Error(errorData.detail || t('vault.error_delete_failed'));
             }
 
             setTools(prev => prev.filter(t => t.tool_name !== toolName));
             setConfirmDelete(null);
         } catch (err) {
-            console.error("Delete error:", err);
             if (setAppError) setAppError(err.message || t('vault.error_delete'));
         } finally {
             setIsDeleting(false);
@@ -136,21 +135,13 @@ const Vault = ({ setAppError }) => {
     };
 
     const categoryKeywords = {
-        'פיתוח קוד': ['code', 'dev', 'react', 'tailwind', 'program', 'cursor', 'v0', 'github'],
         'code development': ['code', 'dev', 'react', 'tailwind', 'program', 'cursor', 'v0', 'github'],
-        'יצירת תמונות ועיצוב': ['image', 'design', 'midjourney', 'art', 'creative', 'ui', 'dall-e', 'luma'],
         'image creation & design': ['image', 'design', 'midjourney', 'art', 'creative', 'ui', 'dall-e', 'luma'],
-        'כתיבה וטקסט': ['text', 'write', 'content', 'chat', 'perplexity', 'claude', 'knowledge', 'gpt', 'model'],
         'writing & text': ['text', 'write', 'content', 'chat', 'perplexity', 'claude', 'knowledge', 'gpt', 'model'],
-        'עריכת וידאו': ['video', 'film', 'edit', 'heygen', 'runway'],
         'video editing': ['video', 'film', 'edit', 'heygen', 'runway'],
-        'דיבוב ושמע': ['audio', 'music', 'vocal', 'sound', 'suno', 'elevenlabs'],
         'voiceover & audio': ['audio', 'music', 'vocal', 'sound', 'suno', 'elevenlabs'],
-        'שיווק ו-seo': ['marketing', 'seo', 'sales', 'brand', 'campaign'],
         'marketing & seo': ['marketing', 'seo', 'sales', 'brand', 'campaign'],
-        'מצגות משקיעים': ['present', 'gamma', 'slide', 'deck', 'pitch'],
         'investor decks': ['present', 'gamma', 'slide', 'deck', 'pitch'],
-        'כלים ארגוניים': ['enterprise', 'automat', 'zapier', 'workflow', 'make', 'task', 'api'],
         'enterprise tools': ['enterprise', 'automat', 'zapier', 'workflow', 'make', 'task', 'api'],
     };
 
@@ -175,21 +166,21 @@ const Vault = ({ setAppError }) => {
             tool.analysis?.intents_mapped?.some(intent => (intent.intent_description || "").toLowerCase().includes(qLower));
     });
 
-    const dir = i18n.dir();
+    const dir = 'ltr';
 
     return (
-        <div className="w-full flex justify-center pb-24 px-4 sm:px-6 lg:px-8 mt-12 animate-in fade-in duration-700">
+        <div className="w-full relative flex justify-center pb-24 px-4 sm:px-6 lg:px-8 mt-12 animate-in fade-in duration-700">
             <div className="w-full max-w-5xl">
 
                 {/* Header Section */}
-                <div className={`mb-12 text-center md:${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                <div className="mb-12 text-center md:text-left">
                     <div className="inline-flex items-center justify-center p-3 bg-cyan-500/10 rounded-2xl border border-cyan-500/20 mb-6 drop-shadow-[0_0_15px_rgba(6,182,212,0.15)]">
                         <Server className="w-8 h-8 text-cyan-400" />
                     </div>
                     <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
-                        {t('vault.title')} <span className="text-transparent bg-clip-text bg-gradient-to-l from-cyan-400 to-blue-500 font-light mx-2">The Vault</span>
+                        {t('vault.title')} <span className="text-transparent bg-clip-text bg-gradient-to-l from-cyan-400 to-blue-500 font-light mx-2">the-vault</span>
                     </h1>
-                    <p className={`text-lg text-white/60 max-w-2xl text-center md:${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <p className="text-lg text-white/60 max-w-2xl text-center md:text-left">
                         {t('vault.subtitle')}
                     </p>
                 </div>
@@ -224,7 +215,7 @@ const Vault = ({ setAppError }) => {
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <Clock className="w-5 h-5 text-emerald-400 mb-4" />
                         <div className="text-lg font-bold text-white mb-1 mt-2 tracking-wider">
-                            {stats?.last_scan_date ? new Date(stats.last_scan_date).toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US') : "N/A"}
+                            {stats?.last_scan_date ? new Date(stats.last_scan_date).toLocaleDateString('en-US') : "N/A"}
                         </div>
                         <div className="text-xs text-white/50 uppercase tracking-widest font-medium mt-2">{t('vault.last_scan')}</div>
                     </div>
@@ -235,16 +226,16 @@ const Vault = ({ setAppError }) => {
                     <div className="p-6 border-b border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
                         <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.6)] animate-pulse" />
-                            Live Database
+                            {t('vault.live_database')}
                         </h2>
                         <div className="relative w-full md:w-64">
-                            <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-white/40`} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <input
                                 type="text"
                                 placeholder={t('vault.search_placeholder')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className={`w-full bg-white/5 border border-white/10 rounded-lg py-2 ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} text-sm focus:outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-all text-white placeholder-white/30`}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-all text-white placeholder-white/30"
                             />
                         </div>
                     </div>
@@ -256,7 +247,7 @@ const Vault = ({ setAppError }) => {
                         <div className="p-4 bg-red-500/5 border-b border-red-500/10 flex items-center justify-between">
                             <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
                                 <Shield className="w-4 h-4" />
-                                Admin Panel
+                                {t('vault.admin_panel')}
                             </div>
                             <button 
                                 onClick={() => {
@@ -277,7 +268,7 @@ const Vault = ({ setAppError }) => {
                         ) : filteredTools.length === 0 ? (
                             <div className="p-12 text-center text-white/50 text-sm">{t('vault.no_results')}</div>
                         ) : (
-                            <table className={`w-full text-sm ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <table className="w-full text-sm text-left">
                                 <thead>
                                     <tr className="bg-white/[0.02] border-b border-white/5 text-white/40 uppercase tracking-widest text-[0.65rem] font-medium">
                                         {isAdmin && <th className="px-6 py-4 font-medium">{t('vault.col_manage')}</th>}
@@ -335,11 +326,11 @@ const Vault = ({ setAppError }) => {
                                                     <Link to={`/tool/${tool.tool_name.toLowerCase().replace(/\s+/g, '-')}`} className="hover:text-cyan-400 transition-colors">
                                                         {tool.tool_name.charAt(0).toUpperCase() + tool.tool_name.slice(1)}
                                                     </Link>
-                                                    {!tool.is_active && <span className="text-[10px] text-red-400 uppercase font-bold">Inactive</span>}
+                                                    {!tool.is_active && <span className="text-[10px] text-red-400 uppercase font-bold">{t('vault.inactive')}</span>}
                                                 </div>
                                                 {tool.trust_score >= 90 && (
                                                     <span className="px-2 py-0.5 rounded text-[0.6rem] uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                                                        Elite
+                                                        {t('vault.elite')}
                                                     </span>
                                                 )}
                                             </td>
@@ -416,7 +407,7 @@ const Vault = ({ setAppError }) => {
                                                         <AlertCircle className="w-4 h-4 text-red-400" />
                                                     )}
                                                     <span className="text-xs text-white/40">
-                                                        {new Date(tool.audit_log?.timestamp || Date.now()).toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US')}
+                                                        {new Date(tool.audit_log?.timestamp || Date.now()).toLocaleDateString('en-US')}
                                                     </span>
                                                 </div>
                                             </td>
