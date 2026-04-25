@@ -1,26 +1,34 @@
 """
-LocalEmbeddingEngine — Singleton ONNX Embedding Service
+RemoteEmbeddingEngine — Gemini-powered Embedding Service
 =========================================================
-Loads BAAI/bge-small-en-v1.5 ONNX model exactly once into memory.
-Uses onnxruntime + tokenizers directly — no fastembed dependency,
-so it works across all Python versions (3.11 Docker + 3.14 local).
+Replaces local ONNX models with Google's text-embedding-004.
+Eliminates heavy dependencies (onnxruntime, tokenizers) to fit Render 512MB limit.
 
-Model: ~33M params, ~130MB RAM, 384 dimensions.
-CRITICAL: Run uvicorn with --workers 1 to prevent RAM duplication.
+Model: text-embedding-004
+Dimensions: 768 (Default)
 """
 import os
 import numpy as np
-from pathlib import Path
+from typing import List, Optional
+from google import genai
+from google.genai import types
 
 
 class LocalEmbeddingEngine:
+    """
+    Renamed to LocalEmbeddingEngine to maintain compatibility with existing code,
+    but performs remote calls to Google Gemini API.
+    """
     _instance = None
-    _session = None
-    _tokenizer = None
 
-    EMBEDDING_DIM = 384  # paraphrase-multilingual-MiniLM-L12-v2 output dimension
-    MODEL_ID = "Xenova/paraphrase-multilingual-MiniLM-L12-v2"
-    CACHE_DIR = os.environ.get("FASTEMBED_CACHE_DIR", "/tmp/fastembed_cache")
+    def __init__(self):
+        self.api_key = os.environ.get("GEMINI_API_KEY")
+        if not self.api_key:
+            print("[Embedder] WARNING: GEMINI_API_KEY not found in environment.")
+        
+        self.client = genai.Client(api_key=self.api_key)
+        self.model_id = "text-embedding-004"
+        print(f"[Embedder] Initialized Remote Engine using {self.model_id}")
 
     @classmethod
     def get_instance(cls) -> "LocalEmbeddingEngine":
@@ -29,93 +37,55 @@ class LocalEmbeddingEngine:
             cls._instance = cls()
         return cls._instance
 
-    def __init__(self):
-        if LocalEmbeddingEngine._session is None:
-            self._load_model()
-
-    def _load_model(self):
-        """Download (if needed) and load the ONNX model + tokenizer."""
-        import onnxruntime as ort
-        from tokenizers import Tokenizer
-        from huggingface_hub import hf_hub_download
-
-        print(f"[Embedder] Loading {self.MODEL_ID} via ONNX Runtime ...")
-
-        cache_dir = self.CACHE_DIR
-        os.makedirs(cache_dir, exist_ok=True)
-
-        # Download model files from HuggingFace Hub
-        onnx_path = hf_hub_download(
-            repo_id=self.MODEL_ID,
-            filename="onnx/model.onnx",
-            cache_dir=cache_dir,
-        )
-        tokenizer_path = hf_hub_download(
-            repo_id=self.MODEL_ID,
-            filename="tokenizer.json",
-            cache_dir=cache_dir,
-        )
-
-        # Load ONNX session (CPU only — fits Render 512MB)
-        sess_options = ort.SessionOptions()
-        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_options.intra_op_num_threads = 1  # Save RAM on free tier
-
-        LocalEmbeddingEngine._session = ort.InferenceSession(
-            onnx_path,
-            sess_options=sess_options,
-            providers=["CPUExecutionProvider"],
-        )
-
-        # Load tokenizer
-        LocalEmbeddingEngine._tokenizer = Tokenizer.from_file(tokenizer_path)
-        LocalEmbeddingEngine._tokenizer.enable_truncation(max_length=512)
-        LocalEmbeddingEngine._tokenizer.enable_padding(pad_id=0, pad_token="[PAD]", length=512)
-
-        print("[Embedder] Model loaded successfully. Ready for embedding.")
-
     # ── public API ──────────────────────────────────────────────
 
     def is_ready(self) -> bool:
-        """Checks if the ONNX session and tokenizer are initialized."""
-        return self._session is not None and self._tokenizer is not None
+        """Checks if the API key is configured."""
+        return self.api_key is not None
 
     def embed(self, text: str) -> np.ndarray:
-        """Embed a single text string. Returns float32 numpy array (384,)."""
-        encoded = self._tokenizer.encode(text)
+        """
+        Embed a single text string using Gemini API.
+        Returns float32 numpy array (768,).
+        """
+        if not text.strip():
+            return np.zeros(768, dtype=np.float32)
 
-        input_ids = np.array([encoded.ids], dtype=np.int64)
-        attention_mask = np.array([encoded.attention_mask], dtype=np.int64)
-        token_type_ids = np.zeros_like(input_ids, dtype=np.int64)
+        try:
+            result = self.client.models.embed_content(
+                model=self.model_id,
+                contents=text,
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
+            )
+            
+            vector = result.embeddings[0].values
+            return np.array(vector, dtype=np.float32)
+        except Exception as e:
+            print(f"[Embedder] API Error: {e}")
+            # Return zero vector on failure to prevent crash, 
+            # though search quality will drop for this specific item.
+            return np.zeros(768, dtype=np.float32)
 
-        outputs = self._session.run(
-            None,
-            {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-                "token_type_ids": token_type_ids,
-            },
-        )
+    def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
+        """
+        Embed a list of texts. Uses Gemini batch embedding API for efficiency.
+        """
+        if not texts:
+            return []
 
-        # outputs[0] is (1, seq_len, 384) — mean pooling over valid tokens
-        token_embeddings = outputs[0]  # shape: (1, seq_len, 384)
-        mask_expanded = attention_mask[:, :, np.newaxis].astype(np.float32)
-
-        summed = np.sum(token_embeddings * mask_expanded, axis=1)
-        counts = np.sum(mask_expanded, axis=1)
-        counts = np.maximum(counts, 1e-9)  # prevent division by zero
-        mean_pooled = summed / counts
-
-        # L2 normalize
-        norm = np.linalg.norm(mean_pooled, axis=1, keepdims=True)
-        norm = np.maximum(norm, 1e-9)
-        normalized = mean_pooled / norm
-
-        return normalized[0].astype(np.float32)
-
-    def embed_batch(self, texts: list) -> list:
-        """Embed a list of texts. Returns list of float32 numpy arrays."""
-        return [self.embed(t) for t in texts]
+        try:
+            # text-embedding-004 supports batching
+            result = self.client.models.embed_content(
+                model=self.model_id,
+                contents=texts,
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT")
+            )
+            
+            return [np.array(emb.values, dtype=np.float32) for emb in result.embeddings]
+        except Exception as e:
+            print(f"[Embedder] Batch API Error: {e}")
+            # Fallback to individual calls if batch fails or just return zeros
+            return [self.embed(t) for t in texts]
 
     def embed_to_bytes(self, text: str) -> bytes:
         """Embed and convert to raw bytes for BLOB storage."""

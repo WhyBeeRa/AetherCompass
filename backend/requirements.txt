@@ -11,7 +11,4 @@ firebase-admin
 beautifulsoup4
 duckduckgo-search
 google-genai
-onnxruntime
-tokenizers
-huggingface-hub
 psutil

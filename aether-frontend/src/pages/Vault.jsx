@@ -154,8 +154,6 @@ const Vault = ({ setAppError }) => {
 
     const dir = 'ltr';
 
-    const dir = 'ltr';
-
     return (
         <div className="w-full relative flex justify-center pb-24 px-4 sm:px-6 lg:px-8 mt-12 animate-in fade-in duration-700">
             <div className="w-full max-w-5xl">
