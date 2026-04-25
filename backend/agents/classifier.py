@@ -22,7 +22,7 @@ You must output ONLY valid JSON matching this schema:
     "speed": 4, // 1-5 integer
     "value": 4, // 1-5 integer
     "ease_of_use": 4, // 1-5 integer
-    "learning_curve": "string description (e.g. קל מאוד, בינוני, קשה)",
+    "learning_curve": "string description (e.g. Very Easy, Medium, Hard)",
     "pricing": "string description (e.g. Freemium)",
     "integration": "string description (e.g. Web / API)"
   },
@@ -35,7 +35,7 @@ You must output ONLY valid JSON matching this schema:
         "trade_off": "Trade off description or null"
     }
   ],
-  "executive_summary": "Two sentences. First peak, second trade-off. Use Hebrew if appropriate or English.",
+  "executive_summary": "Two sentences. First peak, second trade-off. Output ONLY in English. NO HEBREW ALLOWED.",
   "pros": ["Pro 1", "Pro 2"],
   "cons": ["Con 1", "Con 2"],
   "use_cases": ["Use Case 1", "Use Case 2"]
@@ -48,9 +48,30 @@ class ClassifierAgent:
     Transforming raw evidence into The Truth.
     """
     def __init__(self):
-        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            print("WARNING: GEMINI_API_KEY is missing. ClassifierAgent is disabled.")
+            self.client = None
+        else:
+            self.client = genai.Client(api_key=api_key)
 
     async def _query_llm(self, prompt: str, findings: ScoutFindings) -> Dict:
+        # Fallback data in case of error or missing client
+        fallback = {
+            "metrics": {"accuracy": 3, "speed": 3, "value": 3, "ease_of_use": 3, "learning_curve": "Medium", "pricing": "Unknown", "integration": "Web"},
+            "visual_quality": "Mid",
+            "job_to_be_done": [findings.user_intent],
+            "intents_mapped": [{"intent_description": findings.user_intent, "success_score": 50.0, "trade_off": "Unknown"}],
+            "executive_summary": f"{findings.tool_name} is an AI tool. Trade-offs unknown.",
+            "pros": ["Unknown"],
+            "cons": ["Unknown"],
+            "use_cases": [findings.user_intent]
+        }
+
+        if not self.client:
+            print(f"Classifier: Agent disabled (missing API key). Using fallback for {findings.tool_name}.")
+            return fallback
+
         full_prompt = f"{prompt}\n\nScout Findings:\n{findings.model_dump_json()}"
         try:
             response = await asyncio.to_thread(
@@ -65,17 +86,7 @@ class ClassifierAgent:
             return data
         except Exception as e:
             print(f"Classifier error: {e}")
-            # Fallback
-            return {
-                "metrics": {"accuracy": 3, "speed": 3, "value": 3, "ease_of_use": 3, "learning_curve": "בינוני", "pricing": "Unknown", "integration": "Web"},
-                "visual_quality": "Mid",
-                "job_to_be_done": [findings.user_intent],
-                "intents_mapped": [{"intent_description": findings.user_intent, "success_score": 50.0, "trade_off": "Unknown"}],
-                "executive_summary": f"{findings.tool_name} is an AI tool. Trade-offs unknown.",
-                "pros": ["Unknown"],
-                "cons": ["Unknown"],
-                "use_cases": [findings.user_intent]
-            }
+            return fallback
 
     async def analyze(self, findings: ScoutFindings) -> LabAnalysis:
         print(f"Lab: Analyzing findings for {findings.tool_name}...")
@@ -88,7 +99,7 @@ class ClassifierAgent:
             speed=metrics_data.get("speed", 3),
             value=metrics_data.get("value", 3),
             ease_of_use=metrics_data.get("ease_of_use", 3),
-            learning_curve=metrics_data.get("learning_curve", "בינוני"),
+            learning_curve=metrics_data.get("learning_curve", "Medium"),
             pricing=metrics_data.get("pricing", "Freemium"),
             integration=metrics_data.get("integration", "Web / API"),
             last_verified=datetime.now()

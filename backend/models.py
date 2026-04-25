@@ -113,17 +113,17 @@ class ToolMetrics(BaseModel):
     
     # Aether Audit - Phase 2026 Core Metrics
     skill_multiplier: int = Field(default=3, ge=1, le=5, description="Ability to turn a junior into a senior output")
-    hallucination_score: int = Field(default=5, ge=1, le=5, description="Reliability vs Hallucinations (5 = Zero Hallucination)")
+    hallucination_score: float = Field(default=100.0, ge=0, le=100, description="Reliability Score (0-100, 100 = Zero Hallucination)")
     
     # UI Metadata for the 3-Card Drop & ToolDetails
-    learning_curve: str = Field(default="בינוני", description="קל מאוד, בינוני, קשה, מיועד למפתחים")
-    pricing: str = Field(default="Freemium", description="Freemium, תשלום חודשי, פתוח לכולם")
-    integration: str = Field(default="Web / API", description="אינטגרציות מרכזיות, למשל Slack, Web, API מותאם")
+    learning_curve: str = Field(default="Medium", description="Very Easy, Medium, Hard, For Developers")
+    pricing: str = Field(default="Freemium", description="Freemium, Monthly, Open to all")
+    integration: str = Field(default="Web / API", description="Major integrations, e.g., Slack, Web, Custom API")
     
     # Comparison Matrix Labels
-    latency_label: str = Field(default="2.4s", description="זמן תגובה ממוצע לתצוגה")
-    cost_label: str = Field(default="$0.01 / task", description="עלות מוערכת לביצוע משימה")
-    privacy_grade: str = Field(default="Enterprise Safe", description="דרגת פרטיות (למשל A, B, Enterprise Ready)")
+    latency_label: str = Field(default="2.4s", description="Average response time for display")
+    cost_label: str = Field(default="$0.01 / task", description="Estimated cost per task")
+    privacy_grade: str = Field(default="Enterprise Safe", description="Privacy grade (e.g., A, B, Enterprise Ready)")
 
     last_verified: datetime = Field(default_factory=datetime.now, description="Critical to track model drift")
 
@@ -237,12 +237,12 @@ class ManualToolEntry(BaseModel):
     value: int = Field(4, ge=1, le=5)
     ease_of_use: int = Field(4, ge=1, le=5)
     skill_multiplier: int = Field(3, ge=1, le=5)
-    hallucination_score: int = Field(4, ge=1, le=5)
+    hallucination_score: float = Field(80.0, ge=0, le=100)
     latency_label: str = "2.4s"
     cost_label: str = "$0.01 / task"
     privacy_grade: str = "Enterprise Safe"
     pricing: str = "Freemium"
-    learning_curve: str = "בינוני"
+    learning_curve: str = "Medium"
     visual_quality: str = "Mid"
     image_url: Optional[str] = None
     
@@ -256,7 +256,7 @@ class ManualToolEntry(BaseModel):
     @classmethod
     def split_and_clean(cls, v):
         if isinstance(v, str):
-            # מפצל לפי פסיק, מנקה רווחים ומסנן מחרוזות ריקות
+            # Splits by comma, cleans whitespace and filters empty strings
             return [item.strip() for item in v.split(',') if item.strip()]
         return v
 

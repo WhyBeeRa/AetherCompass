@@ -36,10 +36,10 @@ export function SearchBar({ onSearch, isLoading, statusText }) {
                         ? "border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)] bg-white/20 backdrop-blur-md/60"
                         : "border-white/10 hover:border-white/20 hover:bg-white/20 backdrop-blur-md/50"
                         }`}
-                    dir="rtl"
+                    dir="ltr"
                 >
                     {/* Top: Input Area */}
-                    <div className="w-full px-4 pt-4 pb-2">
+                    <div className="w-full px-4 pt-4 pb-2 text-left">
                         <textarea
                             ref={textareaRef}
                             value={query}
@@ -47,7 +47,7 @@ export function SearchBar({ onSearch, isLoading, statusText }) {
                             onFocus={() => setIsFocused(true)}
                             onBlur={() => setIsFocused(false)}
                             onKeyDown={handleKeyDown}
-                            placeholder="לדוגמה: אני מחפש כלי חינמי לבניית מצגות משקיעים מטקסט..."
+                            placeholder="Example: I'm looking for a free tool to build investor pitch decks from text..."
                             disabled={isLoading}
                             rows={1}
                             className="w-full bg-transparent border-none outline-none text-white placeholder-slate-500 text-lg font-normal tracking-wide disabled:opacity-50 disabled:cursor-not-allowed resize-none overflow-hidden"
@@ -70,7 +70,7 @@ export function SearchBar({ onSearch, isLoading, statusText }) {
                                     : "bg-white/10 backdrop-blur-md border border-white/5 text-white/60 cursor-not-allowed"
                                     }`}
                             >
-                                התאם לי כלי
+                                Match tool for me
                             </button>
                         )}
                     </div>

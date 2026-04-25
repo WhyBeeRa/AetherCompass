@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -39,11 +39,11 @@ async def run_scan():
         try:
             result = await pipeline.run_pipeline(intent)
             if result.get("status") == "success":
-                print(f"ג… Successfully scanned, analyzed, and saved: {result.get('tool_name')}")
+                print(f"✅ Successfully scanned, analyzed, and saved: {result.get('tool_name')}")
             else:
-                print(f"ג Failed or Rejected for {intent}: {result.get('reason')}")
+                print(f"❌ Failed or Rejected for {intent}: {result.get('reason')}")
         except Exception as e:
-            print(f"ג ן¸ Critical Error during pipeline execution for {intent}: {e}")
+            print(f"⚠️ Critical Error during pipeline execution for {intent}: {e}")
             
     print("\nInitial Scan Cycle Complete.")
 

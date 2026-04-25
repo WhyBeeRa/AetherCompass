@@ -83,10 +83,10 @@ class AetherSearchEngine:
             # Build match_reason from pre-stored data (no LLM needed)
             summary = analysis.get("executive_summary", "")
             jobs = analysis.get("job_to_be_done", [])
-            match_reason = summary if summary else (", ".join(jobs) if jobs else "התאמה סמנטית")
+            match_reason = summary if summary else (", ".join(jobs) if jobs else "Semantic match")
 
             # Primary intent from first job_to_be_done
-            primary_intent = jobs[0] if jobs else "כלי AI"
+            primary_intent = jobs[0] if jobs else "AI Tool"
 
             formatted.append({
                 "id": slug_id,
@@ -126,8 +126,8 @@ class AetherSearchEngine:
                 "title": r["tool_name"].title(),
                 "trust_score": r.get("trust_score", 0),
                 "analysis": analysis,
-                "match_reason": summary or "התאמה נמצאה על בסיס חיפוש מילות מפתח",
-                "primary_intent": jobs[0] if jobs else "כלי AI",
+                "match_reason": summary or "Match found based on keyword search",
+                "primary_intent": jobs[0] if jobs else "AI Tool",
                 "relevance_score": 60,
                 "similarity": 0.0,
                 "metrics": analysis.get("metrics", {}),

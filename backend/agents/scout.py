@@ -1,8 +1,10 @@
 import asyncio
 import os
 import json
-from typing import List, Dict
+import aiohttp
+from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel, Field
 from models import ScoutFindings, VisualProof
 from google import genai
 from google.genai import types
@@ -10,83 +12,128 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+class ScoutResponseSchema(BaseModel):
+    """
+    Structured response schema for the Scout Agent.
+    """
+    tool_name: str = Field(..., description="Name of the AI tool discovered")
+    source: str = Field(..., description="The specific source where this tool was found (e.g. Reddit r/LocalLLaMA)")
+    user_intent: str = Field(..., description="The specific problem or intent this tool solves")
+    raw_sentiment: str = Field(..., description="A summary of community sentiment or developer feedback")
+    tech_stack: str = Field(..., description="Technical stack (e.g. Transformers, Python, API-only)")
+    reliability_score: int = Field(..., ge=0, le=100, description="Calculated reliability score from 0-100 based on evidence")
+    hype_factor: bool = Field(..., description="True if the tool is surrounded by marketing hype vs real substance")
+    visual_proofs: List[dict] = Field(..., description="List of visual proofs with 'url' and 'source_url'. Use null for url if no image.")
+
 SCOUT_SYSTEM_PROMPT = """
 Role: You are the Commander of the "Scout" Agent for Aether - the Single Source of Truth for the AI world. 
 Your mission is to bypass marketing hype and retrieve raw, verified evidence of AI tool capabilities.
 
-Objective: Scan the digital landscape to identify new AI tools from HIGH-QUALITY sources (e.g., GitHub, HackerNews, specialized subreddits like r/LocalLLaMA, top technical blogs, and trusted directories like 'There is an AI for that').
-The user wants to scan for an AI tool matching a specific intent or query. Focus on delivering factual, evidence-based results.
+Objective: Analyze the provided Reddit discussion data to identify a specific AI tool matching the user's intent. 
+Focus on delivering factual, evidence-based results.
 
-You must output ONLY valid JSON matching this exact schema. You MUST provide real source URLs instead of simulated ones.
-{
-  "tool_name": "Name of the tool",
-  "source": "Name of the concrete high-quality source (e.g., HackerNews, Reddit, Official Docs)",
-  "user_intent": "The user's intent",
-  "raw_sentiment": "A summary of general sentiment found in reviews",
-  "tech_stack": "e.g., LLM, Generative AI, or API only",
-  "reliability_score": 90.0,
-  "hype_factor": false,
-  "visual_proofs": [
-    {
-      "url": "A realistic image URL representing the tool interface or output",
-      "source_url": "The EXACT real URL where this evidence or tool was found (e.g. project URL or official site)"
-    }
-  ]
-}
-Ensure the image URL is a real unsplash URL or highly plausible placeholder if real isn't known. The `source_url` MUST be a real, verifiable web link to the tool or its community discussion.
+Instructions:
+- If no specific tool is found in the data, try to identify the most relevant tool being discussed.
+- Calculate a reliability_score (0-100) based on the depth of technical discussion and absence of "hype" words.
+- For visual_proofs, if a real image URL is present in the discussion, use it. Otherwise, set the 'url' to null. 
+- DO NOT use Unsplash or any other placeholder image service.
+- The 'source_url' must be the link to the Reddit post or tool website.
 """
 
 class ScoutAgent:
     def __init__(self):
         """
         The Scout: Officer of Discovery.
-        Scans sources to find new AI tools, filtering out hype and focusing on evidence.
+        Scans Reddit via public JSON endpoints and uses GenAI to find and verify new AI tools.
         """
-        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            print("WARNING: GEMINI_API_KEY is missing. ScoutAgent is disabled.")
+            self.client = None
+        else:
+            self.client = genai.Client(api_key=api_key)
 
-    def calculate_reliability(self, content: str, has_visuals: bool) -> float:
-        return 90.0 # Handled by LLM now
+        # Unique User-Agent to avoid Reddit 429 errors
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AetherScout/1.0"
+        }
 
-    def _is_hype(self, content: str) -> bool:
-        return False
+    async def fetch_reddit_context(self, query: str, limit: int = 10) -> str:
+        """
+        Fetches data from public Reddit JSON endpoints using aiohttp.
+        """
+        subreddits = ["LocalLLaMA", "MachineLearning", "ArtificialInteligence", "ChatGPTCoders"]
+        all_context = []
+        
+        async with aiohttp.ClientSession(headers=self.headers) as session:
+            for sub in subreddits:
+                # Using search endpoint to find relevant tools for the intent
+                url = f"https://www.reddit.com/r/{sub}/search.json?q={query}&limit={limit}&restrict_sr=1&sort=relevance"
+                try:
+                    async with session.get(url, timeout=10) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            children = data.get("data", {}).get("children", [])
+                            for child in children:
+                                post = child.get("data", {})
+                                title = post.get("title", "")
+                                selftext = post.get("selftext", "")[:800] # Limit text per post
+                                all_context.append(f"Subreddit: r/{sub}\nTitle: {title}\nContent: {selftext}\nURL: https://reddit.com{post.get('permalink', '')}")
+                        elif resp.status == 429:
+                            print(f"Scout: Reddit rate limited (429) for r/{sub}")
+                        else:
+                            print(f"Scout: Reddit error {resp.status} for r/{sub}")
+                except Exception as e:
+                    print(f"Scout: Error fetching from r/{sub}: {e}")
+        
+        return "\n---\n".join(all_context) if all_context else "No Reddit data found for this intent."
 
     async def run_discovery_cycle(self, intent: str) -> List[ScoutFindings]:
-        print(f"Scout: Initiating Operation for intent '{intent}' using New GenAI SDK...")
+        if not self.client:
+            print(f"Scout: Discovery skipped for '{intent}' (Gemini disabled).")
+            return []
+
+        print(f"Scout: Initiating Operation for intent '{intent}' using Public Reddit API...")
         
-        prompt = f"{SCOUT_SYSTEM_PROMPT}\n\nUser Intent to scan for: {intent}"
+        # 1. Fetch Reddit Context
+        reddit_data = await self.fetch_reddit_context(intent)
+        
+        prompt = f"{SCOUT_SYSTEM_PROMPT}\n\nUser Intent: {intent}\n\nReddit Data Found:\n{reddit_data}"
         
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
+            # 2. Call Gemini using native async client
+            response = await self.client.aio.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
+                    response_mime_type="application/json",
+                    response_schema=ScoutResponseSchema
                 )
             )
-            data = json.loads(response.text)
+            
+            data = response.parsed
             
             proofs = []
-            for vp in data.get("visual_proofs", []):
+            for vp in data.visual_proofs:
                 proofs.append(VisualProof(
-                    url=vp.get("url"),
-                    source_url=vp.get("source_url")
+                    url=vp.get("url"), 
+                    source_url=vp.get("source_url") or "https://reddit.com"
                 ))
                 
             finding = ScoutFindings(
-                tool_name=data.get("tool_name", "Unknown Tool"),
-                source=data.get("source", "Simulated Web Scan"),
-                user_intent=data.get("user_intent", intent),
-                raw_sentiment=data.get("raw_sentiment", "Positive"),
-                tech_stack=data.get("tech_stack", "AI"),
-                reliability_score=data.get("reliability_score", 90.0),
-                hype_factor=data.get("hype_factor", False),
+                tool_name=data.tool_name,
+                source=data.source,
+                user_intent=data.user_intent,
+                raw_sentiment=data.raw_sentiment,
+                tech_stack=data.tech_stack,
+                reliability_score=float(data.reliability_score),
+                hype_factor=data.hype_factor,
                 visual_proofs=proofs
             )
             
-            print(f"Scout: Mission Report. 1 candidate extracted: {finding.tool_name}")
+            print(f"Scout: Mission Report. Candidate identified: {finding.tool_name} (Reliability: {finding.reliability_score})")
             return [finding]
             
         except Exception as e:
-            print(f"Scout: Error during discovery: {e}")
+            print(f"Scout: Error during discovery cycle: {e}")
             return []

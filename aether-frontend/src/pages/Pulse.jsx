@@ -11,7 +11,7 @@ export default function Pulse() {
     ];
 
     return (
-        <div className="w-full min-h-screen pt-24 pb-24 rtl animate-in fade-in duration-700 bg-black text-white" dir="rtl">
+        <div className="w-full min-h-screen pt-24 pb-24 ltr animate-in fade-in duration-700 bg-black text-white" dir="ltr">
             <main className="max-w-7xl mx-auto px-6">
                 
                 {/* Header */}
@@ -28,8 +28,8 @@ export default function Pulse() {
                         <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-2">
                             the <span className="text-emerald-500">Pulse</span>
                         </h1>
-                        <p className="text-white/50 font-medium">
-                            עקוב אחרי ה-Latency, הדיוק וה-Uptime של מנועי ה-AI המובילים בזמן אמת.
+                        <p className="text-white/50 font-medium text-left">
+                            Monitor Latency, Accuracy, and Uptime of leading AI engines in real-time.
                         </p>
                     </div>
                     <div className="text-left font-mono text-emerald-500/50 text-xs">
@@ -61,7 +61,7 @@ export default function Pulse() {
                     <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
                         <h2 className="text-xl font-black flex items-center gap-3">
                             <BarChart3 className="w-5 h-5 text-emerald-500" />
-                            סטטוס ספקים חי
+                            Live Provider Status
                         </h2>
                         <div className="flex gap-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
@@ -102,7 +102,7 @@ export default function Pulse() {
                                 
                                 <div className="flex justify-end">
                                     <button className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white/50 font-bold text-xs hover:bg-white/10 hover:text-white transition-all">
-                                        דוח ביצועים היסטורי
+                                        Historical Performance Report
                                     </button>
                                 </div>
                             </div>
@@ -116,13 +116,13 @@ export default function Pulse() {
                         <AlertTriangle className="w-8 h-8 text-black" />
                     </div>
                     <div>
-                        <h4 className="text-xl font-black text-white mb-2">תובנת מערכת: Claude 3.5 חווה עומס</h4>
-                        <p className="text-white/50 font-medium leading-relaxed">
-                            זיהינו עלייה של 15% ב-Latency בשרתי אירופה של Anthropic. אנחנו ממליצים להעביר Workflows קריטיים ל-GPT-4o ב-30 הדקות הקרובות כדי לשמור על רציפות.
+                        <h4 className="text-xl font-black text-white mb-2 text-left">System Insight: Claude 3.5 is experiencing load</h4>
+                        <p className="text-white/50 font-medium leading-relaxed text-left">
+                            We've detected a 15% latency spike in Anthropic's European servers. We recommend shifting critical workflows to GPT-4o for the next 30 minutes to maintain continuity.
                         </p>
                     </div>
                     <button className="shrink-0 px-8 py-4 bg-emerald-500 text-black font-black rounded-2xl hover:bg-emerald-400 transition-all">
-                        פעולה אוטומטית (Webhook)
+                        Automated Action (Webhook)
                     </button>
                 </div>
 

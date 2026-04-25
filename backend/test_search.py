@@ -13,7 +13,7 @@ async def run_test():
     engine = AetherSearchEngine()
     
     # Force query to be treated as UTF-8
-    query = "כלי ליצירת מצגות" 
+    query = "Presentation tools" 
     print(f"\n[Test] Running Query: '{query}'")
     
     start = time.time()

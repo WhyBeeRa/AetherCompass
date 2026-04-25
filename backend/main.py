@@ -53,7 +53,7 @@ origins = [
     "http://127.0.0.1:8000",
 ]
 
-# 3. הזרקת ה-Middleware
+# 3. Middleware Injection
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -139,7 +139,7 @@ async def startup_event():
                     tool_name=tool_name,
                     metrics=ToolMetrics(
                         accuracy=4, speed=4, value=4, ease_of_use=4,
-                        learning_curve="בינוני", pricing="Freemium", integration="Web"
+                        learning_curve="Medium", pricing="Freemium", integration="Web"
                     ),
                     visual_quality=VisualQuality.MID,
                     job_to_be_done=job_to_be_done,
@@ -256,9 +256,9 @@ def get_gallery_feed():
             continue
             
         # Determine the primary intent or fallback to category
-        primary_intent = "כללי"
+        primary_intent = "General"
         if analysis.get("intents_mapped"):
-            primary_intent = analysis["intents_mapped"][0].get("intent_description", "כללי")
+            primary_intent = analysis["intents_mapped"][0].get("intent_description", "General")
             
         tool_info = {
             "tool_name": tool_name,
@@ -390,7 +390,7 @@ async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(v
             metrics=ToolMetrics(
                 accuracy=4, speed=4, value=4, ease_of_use=4,
                 pricing=data["pricing_model"],
-                learning_curve="בינוני", # Default
+                learning_curve="Medium", # Default
                 latency_label="Unknown",
                 cost_label="Unknown",
                 privacy_grade="Unknown",
@@ -672,7 +672,7 @@ async def background_audit_scouted_tool(task_id: int, url: str, description: str
             metrics=ToolMetrics(
                 accuracy=4, speed=4, value=4, ease_of_use=4,
                 pricing=data.get("pricing_model", "Unknown"),
-                learning_curve="בינוני",
+                learning_curve="Medium",
                 latency_label="Unknown",
                 cost_label="Unknown",
                 privacy_grade="Unknown",

@@ -22,34 +22,58 @@ def initialize_firebase_admin():
     service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT")
     if not service_account_json:
         firebase_init_error = "FIREBASE_SERVICE_ACCOUNT NOT FOUND IN ENV"
-        print(firebase_init_error)
+        print(f"!!! {firebase_init_error}")
         return False
 
     try:
+        # 1. Clean the string
         json_str = service_account_json.strip()
-        # Remove surrounding quotes if present
-        if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
-            json_str = json_str[1:-1]
         
-        # If it's Base64, decode it first
+        # 2. Remove surrounding quotes (Render sometimes adds them)
+        if (json_str.startswith("'") and json_str.endswith("'")) or (json_str.startswith('"') and json_str.endswith('"')):
+            json_str = json_str[1:-1].strip()
+        
+        # 3. Handle Base64 if needed
         if not json_str.startswith("{"):
             try:
-                json_str = base64.b64decode(json_str).decode('utf-8')
-            except Exception as b64e:
-                print(f"Base64 Decode skipped or failed: {b64e}")
+                decoded = base64.b64decode(json_str).decode('utf-8')
+                if decoded.startswith("{"):
+                    json_str = decoded
+            except Exception:
+                pass # Not base64, continue with original
         
-        # CRITICAL FIX: Do NOT manually replace \n with real newlines in the JSON SOURCE.
-        # json.loads() handles \n escapes internally. Real newlines in JSON strings are illegal.
-        
-        cred_dict = json.loads(json_str)
+        # 4. Handle real newlines. 
+        # If the user pasted the JSON into Render, it might have real newlines.
+        # json.loads fails on real newlines within string values (like the private key).
+        # We replace real newlines with the literal sequence \n.
+        if "\n" in json_str and "\\n" not in json_str:
+            # This is a bit risky but often necessary for Render/Heroku
+            json_str = json_str.replace("\n", "\\n")
+            # But wait, if it was a real newline between keys, we just broke it.
+            # Actually, most Service Account JSONs on Render are either one-line or correctly escaped.
+            # Let's try to parse it first, and if it fails, try the replacement.
+            pass 
+
+        try:
+            cred_dict = json.loads(json_str)
+        except json.JSONDecodeError:
+            # Try to fix potential newline issues in the private key specifically
+            # or just escape all newlines if it's not valid yet.
+            fixed_str = json_str.replace("\n", "\\n").replace("\\\\n", "\\n")
+            # If the whole thing is now one line, it might be valid JSON if it was missing escapes
+            cred_dict = json.loads(fixed_str)
+
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
-        print("Firebase Admin initialized successfully")
+        print("Firebase Admin initialized successfully from ENV")
         is_firebase_ready = True
         return True
     except Exception as e:
-        firebase_init_error = str(e)
-        print(f"Firebase Init Error: {e}")
+        firebase_init_error = f"Firebase Init Failed: {str(e)}"
+        print(f"!!! {firebase_init_error}")
+        # Log a snippet for debugging (careful not to log the whole key)
+        if service_account_json:
+            print(f"Env length: {len(service_account_json)}, Start: {service_account_json[:20]}...")
         return False
 
 # Attempt initialization

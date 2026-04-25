@@ -3,7 +3,7 @@ uvicorn
 httpx
 pydantic
 python-dotenv
-praw
+aiohttp
 PyGithub
 openai
 numpy

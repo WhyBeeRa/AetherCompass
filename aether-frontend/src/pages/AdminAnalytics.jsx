@@ -3,8 +3,10 @@ import { BarChart3, Search, Clock, CheckCircle2, XCircle, ArrowLeft } from 'luci
 import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { apiFetch } from '../api';
+import { useTranslation } from 'react-i18next';
 
 const AdminAnalytics = ({ setAppError }) => {
+    const { t } = useTranslation();
     const { currentUser, isAdmin } = useAuth();
     const [queries, setQueries] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -25,14 +27,14 @@ const AdminAnalytics = ({ setAppError }) => {
                 setQueries(data);
             } catch (err) {
                 console.error(err);
-                if (setAppError) setAppError("שגיאה בטעינת אנליטיקות.");
+                if (setAppError) setAppError(t('admin.analytics.error_fetch'));
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchAnalytics();
-    }, [isAdmin, currentUser, setAppError, isLocal]);
+    }, [isAdmin, currentUser, setAppError, isLocal, t]);
 
     const matchCount = queries.filter(q => q.has_match).length;
     const missCount = queries.length - matchCount;
@@ -43,47 +45,47 @@ const AdminAnalytics = ({ setAppError }) => {
             <div className="w-full animate-in fade-in slide-in-from-bottom-5 duration-700">
                 <div className="w-full">
                     
-                    <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6 text-right">
+                    <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6 text-left">
                         <div>
                             <div className="inline-flex items-center justify-center p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 mb-6">
                                 <BarChart3 className="w-8 h-8 text-indigo-400" />
                             </div>
-                            <h1 className="text-4xl font-bold text-white mb-4">Intent Analytics</h1>
-                            <p className="text-white/60">מה המשתמשים באמת מחפשים? נתונים בזמן אמת על כוונות החיפוש.</p>
+                            <h1 className="text-4xl font-bold text-white mb-4">{t('admin.analytics.title')}</h1>
+                            <p className="text-white/60">{t('admin.analytics.subtitle')}</p>
                         </div>
                         
                         <div className="flex gap-4">
                             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 min-w-[120px]">
                                 <div className="text-2xl font-bold text-emerald-400">{matchRate}%</div>
-                                <div className="text-[10px] text-white/40 uppercase tracking-widest">Match Rate</div>
+                                <div className="text-[10px] text-white/40 uppercase tracking-widest">{t('admin.analytics.match_rate')}</div>
                             </div>
                             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 min-w-[120px]">
                                 <div className="text-2xl font-bold text-white">{queries.length}</div>
-                                <div className="text-[10px] text-white/40 uppercase tracking-widest">Total Searches</div>
+                                <div className="text-[10px] text-white/40 uppercase tracking-widest">{t('admin.analytics.total_searches')}</div>
                             </div>
                         </div>
                     </div>
 
                     <div className="bg-[#040914]/80 border border-white/10 rounded-3xl backdrop-blur-xl overflow-hidden shadow-2xl">
-                        <div className="p-6 border-b border-white/5">
+                        <div className="p-6 border-b border-white/5 text-left">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                 <Clock className="w-5 h-5 text-cyan-400" />
-                                Recent Queries
+                                {t('admin.analytics.recent_queries')}
                             </h2>
                         </div>
 
                         <div className="overflow-x-auto">
                             {isLoading ? (
-                                <div className="p-12 text-center text-white/50 animate-pulse">טוען נתונים...</div>
+                                <div className="p-12 text-center text-white/50 animate-pulse">{t('admin.analytics.loading')}</div>
                             ) : queries.length === 0 ? (
-                                <div className="p-12 text-center text-white/50">אין נתוני חיפוש עדיין.</div>
+                                <div className="p-12 text-center text-white/50">{t('admin.analytics.no_data')}</div>
                             ) : (
-                                <table className="w-full text-right text-sm">
+                                <table className="w-full text-left text-sm">
                                     <thead>
                                         <tr className="bg-white/[0.02] border-b border-white/5 text-white/40 uppercase tracking-widest text-[0.65rem] font-medium">
-                                            <th className="px-6 py-4">פרומפט / חיפוש</th>
-                                            <th className="px-6 py-4">זמן</th>
-                                            <th className="px-6 py-4 text-center">סטטוס</th>
+                                            <th className="px-6 py-4">{t('admin.analytics.col_query')}</th>
+                                            <th className="px-6 py-4">{t('admin.analytics.col_time')}</th>
+                                            <th className="px-6 py-4 text-center">{t('admin.analytics.col_status')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
@@ -96,7 +98,7 @@ const AdminAnalytics = ({ setAppError }) => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-white/40 text-xs">
-                                                    {new Date(q.timestamp).toLocaleString('he-IL')}
+                                                    {new Date(q.timestamp).toLocaleString('en-US')}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex justify-center">

@@ -31,8 +31,8 @@ Required JSON Structure:
         "speed": 4, # 1-5
         "value": 4, # 1-5
         "ease_of_use": 3, # 1-5
-        "learning_curve": "קל מאוד / בינוני / מיועד למפתחים",
-        "pricing": "Freemium / תשלום חודשי / API",
+        "learning_curve": "Very Easy / Medium / For Developers",
+        "pricing": "Freemium / Monthly / API",
         "integration": "Web / API / VS Code"
     },
     "intents_mapped": [
@@ -115,7 +115,7 @@ async def process_single_tool(tool_raw_info: str, vault: AetherVault, semaphore:
                 speed=m_data.get("speed", 3),
                 value=m_data.get("value", 3),
                 ease_of_use=m_data.get("ease_of_use", 3),
-                learning_curve=m_data.get("learning_curve", "בינוני"),
+                learning_curve=m_data.get("learning_curve", "Medium"),
                 pricing=m_data.get("pricing", "Freemium"),
                 integration=m_data.get("integration", "Web / API")
             )

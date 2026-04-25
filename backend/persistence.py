@@ -645,3 +645,15 @@ class AetherVault:
         rows = c.fetchall()
         conn.close()
         return [dict(r) for r in rows]
+
+    def prune_live_metrics(self, hours: int = 24):
+        """
+        Removes metrics older than X hours to prevent database bloat.
+        """
+        conn = self._get_conn()
+        c = conn.cursor()
+        cutoff = datetime.now() - timedelta(hours=hours)
+        c.execute("DELETE FROM live_metrics WHERE timestamp < ?", (cutoff,))
+        conn.commit()
+        conn.close()
+        print(f"[Vault] Pruned metrics older than {hours} hours.")
