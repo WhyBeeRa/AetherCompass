@@ -9,6 +9,11 @@ from models import ScoutFindings, VisualProof
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+try:
+    from logger_utils import log_terminal
+except ImportError:
+    # Fallback for standalone testing
+    async def log_terminal(m): print(m)
 
 load_dotenv()
 
@@ -90,10 +95,10 @@ class ScoutAgent:
 
     async def run_discovery_cycle(self, intent: str) -> List[ScoutFindings]:
         if not self.client:
-            print(f"Scout: Discovery skipped for '{intent}' (Gemini disabled).")
+            await log_terminal(f"Scout: Discovery skipped for '{intent}' (Gemini disabled).")
             return []
 
-        print(f"Scout: Initiating Operation for intent '{intent}' using Public Reddit API...")
+        await log_terminal(f"Scout: Initiating Operation for intent '{intent}' using Public Reddit API...")
         
         # 1. Fetch Reddit Context
         reddit_data = await self.fetch_reddit_context(intent)
@@ -131,7 +136,7 @@ class ScoutAgent:
                 visual_proofs=proofs
             )
             
-            print(f"Scout: Mission Report. Candidate identified: {finding.tool_name} (Reliability: {finding.reliability_score})")
+            await log_terminal(f"Scout: Mission Report. Candidate identified: {finding.tool_name} (Reliability: {finding.reliability_score})")
             return [finding]
             
         except Exception as e:

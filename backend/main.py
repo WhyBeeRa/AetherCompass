@@ -29,6 +29,10 @@ from community_logic import check_for_badges
 from models import UserProfile, Badge, ToolContribution, LiveMetric
 from pydantic import BaseModel
 from admin_auditor import run_lean_audit
+from agents.scout import ScoutAgent
+import psutil
+from logger_utils import log_streamer, log_terminal
+from fastapi import WebSocket, WebSocketDisconnect
 
 class AuditRequest(BaseModel):
     url: str
@@ -102,9 +106,7 @@ async def startup_event():
     print("Initializing Aether Backend...")
     
     # [Liveliness Indicator] Signal kernel status to the terminal
-    log_path = Path(__file__).parent / "background_tasks.log"
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(f"\n[{datetime.now()}] [SYSTEM] Aether Kernel Online - Command Center Linked\n")
+    await log_terminal("[SYSTEM] Aether Kernel Online - Command Center Linked")
 
     initialize_firebase_admin()
     seed_file = Path(__file__).parent / "seed_data.json"
@@ -210,6 +212,27 @@ async def trigger_pipeline(intent: str, background_tasks: BackgroundTasks):
 def get_status(task_id: str):
     status = task_status.get(task_id, "unknown")
     return {"task_id": task_id, "status": status}
+
+async def scout_task_wrapper(intent: str):
+    """
+    Wrapper for the background task to ensure ScoutAgent runs correctly.
+    """
+    print(f"[Background] Starting ScoutAgent.run_discovery_cycle for: {intent}")
+    try:
+        scout = ScoutAgent()
+        results = await scout.run_discovery_cycle(intent)
+        print(f"[Background] ScoutAgent cycle complete. Found {len(results)} tools.")
+    except Exception as e:
+        print(f"[Background Error] ScoutAgent failed: {e}")
+
+@app.post("/api/agents/scout/run", status_code=202)
+async def run_scout_agent(intent: str, background_tasks: BackgroundTasks):
+    """
+    Triggers the Scout Agent to perform a discovery cycle in the background.
+    """
+    print(f"[API] Triggering Scout Agent for intent: {intent}")
+    background_tasks.add_task(scout_task_wrapper, intent)
+    return {"status": "success", "message": "Scout agent discovery cycle started in background"}
 
 @app.get("/tool/{name}")
 def get_tool_data(name: str):
@@ -635,17 +658,14 @@ def get_leaderboard():
     return vault.get_user_rankings(limit=20)
 
 async def background_audit_scouted_tool(task_id: int, url: str, description: str, submitter_email: str, suggested_name: str = None):
-    log_file = "background_tasks.log"
-    with open(log_file, "a") as f:
-        f.write(f"\n[{datetime.now()}] STARTING AUDIT: {url} (suggested name: {suggested_name}, requested by {submitter_email})\n")
+    await log_terminal(f"STARTING AUDIT: {url} (suggested name: {suggested_name}, requested by {submitter_email})")
 
     try:
         # Update task status to scanning
         vault.update_scout_task(task_id, "scanning")
         
         # Step 1: Run Scraper + Gemini Audit
-        with open(log_file, "a") as f:
-            f.write(f"[{datetime.now()}] Step 1: Running Agent Scan...\n")
+        await log_terminal("Step 1: Running Agent Scan...")
 
         response = await run_lean_audit(url)
         if response.get("status") == "error":
@@ -665,6 +685,8 @@ async def background_audit_scouted_tool(task_id: int, url: str, description: str
         
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] Step 2: Agent Scan Complete. Name: {final_tool_name} (AI target: {data.get('name')}). Trust Score: {data.get('trust_score')}\n")
+        
+        await log_terminal(f"Step 2: Agent Scan Complete. Name: {final_tool_name}. Trust Score: {data.get('trust_score')}")
 
         # Step 2: Construct LabAnalysis
         analysis = LabAnalysis(
@@ -787,6 +809,16 @@ def get_live_benchmarks():
     """
     return vault.get_latest_benchmarks()
 
+@app.post("/api/agents/metrics/run", status_code=202)
+async def run_live_metrics_agent(background_tasks: BackgroundTasks):
+    """
+    Triggers the LiveMonitor agent to scan and benchmark tools in the background.
+    """
+    from live_benchmarking import LiveMonitor
+    monitor = LiveMonitor(vault)
+    background_tasks.add_task(monitor.run_benchmark_cycle)
+    return {"status": "success", "message": "Live metrics benchmarking started in background"}
+
 @app.post("/admin/live-metrics/trigger", dependencies=[Depends(verify_admin_user)])
 async def trigger_live_benchmark(background_tasks: BackgroundTasks, admin_email: str = Depends(verify_admin_user)):
     """
@@ -874,6 +906,39 @@ async def get_system_heartbeat(admin_email: str = Depends(verify_admin_user)):
         "admin_identity": admin_email
     }
 
+@app.get("/api/health")
+async def get_api_health():
+    """
+    Public health check for Telemetry.
+    Returns RAM usage, DB status, and Gemini API status.
+    """
+    # 1. RAM Usage
+    try:
+        ram = psutil.virtual_memory()
+        ram_usage = f"{ram.percent}%"
+    except Exception:
+        ram_usage = "N/A"
+
+    # 2. Database Status (SQLAlchemy/SQLite)
+    db_status = "Disconnected"
+    try:
+        vault.get_stats()
+        db_status = "Connected"
+    except Exception:
+        db_status = "Error"
+
+    # 3. Gemini API Status
+    gemini_status = "Offline"
+    if os.getenv("GEMINI_API_KEY"):
+        gemini_status = "Online"
+
+    return {
+        "ram_usage": ram_usage,
+        "db_status": db_status,
+        "embedder": gemini_status,
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.get("/admin/logs", dependencies=[Depends(verify_admin_user)])
 def get_admin_logs(lines: int = 50, log_type: str = "tasks", admin_email: str = Depends(verify_admin_user)):
     """
@@ -893,6 +958,18 @@ def get_admin_logs(lines: int = 50, log_type: str = "tasks", admin_email: str = 
             return {"log_type": log_type, "lines": last_lines}
     except Exception as e:
         return {"error": str(e)}
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    await log_streamer.connect(websocket)
+    try:
+        while True:
+            # Keep the connection open
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        log_streamer.disconnect(websocket)
+    except Exception:
+        log_streamer.disconnect(websocket)
 
 # --- Phase 9: Gemma Local Worker Batch Upload ---
 

@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from models import LiveMetric
 from persistence import AetherVault
+try:
+    from logger_utils import log_terminal
+except ImportError:
+    async def log_terminal(m): print(m)
 
 class LiveMonitor:
     """
@@ -136,7 +140,7 @@ class LiveMonitor:
         """
         Runs one cycle of benchmarks with local client management and IP block prevention.
         """
-        print(f"[{datetime.now()}] Starting Live Benchmark Cycle (Strict Architecture Mode)...")
+        await log_terminal(f"Starting Live Benchmark Cycle (Strict Architecture Mode)...")
         
         # 1. Fetch tools from Vault
         all_tools = self.vault.search_tools("", include_inactive=True)
@@ -146,7 +150,7 @@ class LiveMonitor:
         print(f"  - Identified {len(targets)} valid benchmarkable targets.")
         
         if not targets:
-            print("  - No valid targets found. Skipping cycle.")
+            await log_terminal("  - No valid targets found. Skipping cycle.")
             return
 
         # 3. Lifecycle Management: Local AsyncClient
@@ -157,7 +161,7 @@ class LiveMonitor:
             metrics = [m for m in results if m is not None]
             
             if not metrics:
-                print("  - No metrics captured.")
+                await log_terminal("  - No metrics captured.")
                 return
 
             # 4. Calculate comparisons and save
@@ -174,12 +178,12 @@ class LiveMonitor:
                     m.comparison_vs_avg = 0
                     
                 self.vault.save_live_metric(m)
-                print(f"  [{m.status}] {m.tool_name}: {m.latency_ms}ms | Reliability: {m.hallucination_score}%")
+                await log_terminal(f"  [{m.status}] {m.tool_name}: {m.latency_ms}ms | Reliability: {m.hallucination_score}%")
 
         # 5. Database Pruning: Remove records older than 24h to prevent bloat
         self.vault.prune_live_metrics(hours=24)
 
-        print(f"[{datetime.now()}] Benchmark Cycle Complete. {len(metrics)} metrics updated.")
+        await log_terminal(f"Benchmark Cycle Complete. {len(metrics)} metrics updated.")
 
 if __name__ == "__main__":
     vault = AetherVault()
