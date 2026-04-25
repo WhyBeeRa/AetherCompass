@@ -20,7 +20,10 @@ const AdminAnalytics = ({ setAppError }) => {
                 setIsLoading(true);
                 const token = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
                 const res = await apiFetch('/admin/analytics', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 });
                 if (!res.ok) throw new Error("Failed to fetch analytics");
                 const data = await res.json();

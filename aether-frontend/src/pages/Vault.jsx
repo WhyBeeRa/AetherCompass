@@ -42,28 +42,46 @@ const Vault = ({ setAppError }) => {
     const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
-        const fetchVaultData = async () => {
+        const fetchVaultStats = async () => {
             try {
-                setIsLoading(true);
                 const statsRes = await apiFetch('/vault/stats');
-                if (!statsRes.ok) throw new Error("Failed to fetch vault stats");
-                const statsData = await statsRes.json();
-                setStats(statsData);
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    setStats(statsData);
+                }
+            } catch (err) {
+                console.error("Vault stats fetch error:", err);
+            }
+        };
 
-                const toolsRes = await apiFetch('/vault/search?q=');
+        fetchVaultStats();
+    }, []);
+
+    // Semantic Search with Debounce
+    useEffect(() => {
+        const fetchTools = async () => {
+            try {
+                // Only show full loader on initial mount
+                if (tools.length === 0) setIsLoading(true);
+                
+                const toolsRes = await apiFetch(`/vault/search?q=${encodeURIComponent(searchQuery)}`);
                 if (!toolsRes.ok) throw new Error("Failed to fetch vault data");
                 const toolsData = await toolsRes.json();
                 setTools(toolsData);
             } catch (err) {
-                console.error("Vault fetch error:", err);
+                console.error("Vault search error:", err);
                 if (setAppError) setAppError(t('vault.error_load'));
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchVaultData();
-    }, [setAppError, t]);
+        const timer = setTimeout(() => {
+            fetchTools();
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, setAppError, t]);
 
     const handleToggleStatus = async (toolName, currentStatus) => {
         try {
@@ -134,37 +152,7 @@ const Vault = ({ setAppError }) => {
         }
     };
 
-    const categoryKeywords = {
-        'code development': ['code', 'dev', 'react', 'tailwind', 'program', 'cursor', 'v0', 'github'],
-        'image creation & design': ['image', 'design', 'midjourney', 'art', 'creative', 'ui', 'dall-e', 'luma'],
-        'writing & text': ['text', 'write', 'content', 'chat', 'perplexity', 'claude', 'knowledge', 'gpt', 'model'],
-        'video editing': ['video', 'film', 'edit', 'heygen', 'runway'],
-        'voiceover & audio': ['audio', 'music', 'vocal', 'sound', 'suno', 'elevenlabs'],
-        'marketing & seo': ['marketing', 'seo', 'sales', 'brand', 'campaign'],
-        'investor decks': ['present', 'gamma', 'slide', 'deck', 'pitch'],
-        'enterprise tools': ['enterprise', 'automat', 'zapier', 'workflow', 'make', 'task', 'api'],
-    };
-
-    const filteredTools = tools.filter(tool => {
-        if (!searchQuery.trim()) return true;
-
-        const qLower = searchQuery.toLowerCase().trim();
-        const keywords = categoryKeywords[qLower];
-
-        if (keywords) {
-            const intents = tool.analysis?.intents_mapped || [];
-            const jobs = tool.analysis?.job_to_be_done || [];
-            const text_corpus = (
-                tool.tool_name + " " +
-                intents.map(i => i.intent_description || "").join(" ") + " " +
-                jobs.join(" ")
-            ).toLowerCase();
-            return keywords.some(k => text_corpus.includes(k));
-        }
-
-        return tool.tool_name.toLowerCase().includes(qLower) ||
-            tool.analysis?.intents_mapped?.some(intent => (intent.intent_description || "").toLowerCase().includes(qLower));
-    });
+    const dir = 'ltr';
 
     const dir = 'ltr';
 
@@ -252,12 +240,12 @@ const Vault = ({ setAppError }) => {
                             <button 
                                 onClick={() => {
                                     if(window.confirm(t('vault.confirm_delete_all'))) {
-                                        filteredTools.forEach(t => handleDelete(t.tool_name));
+                                        tools.forEach(t => handleDelete(t.tool_name));
                                     }
                                 }}
                                 className="px-4 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold hover:bg-red-500/30 transition-all"
                             >
-                                {t('vault.delete_selected', { count: filteredTools.length })}
+                                {t('vault.delete_selected', { count: tools.length })}
                             </button>
                         </div>
                     )}
@@ -265,7 +253,7 @@ const Vault = ({ setAppError }) => {
                     <div className="overflow-x-auto">
                         {isLoading ? (
                             <div className="p-12 text-center text-white/50 animate-pulse text-sm">{t('vault.loading')}</div>
-                        ) : filteredTools.length === 0 ? (
+                        ) : tools.length === 0 ? (
                             <div className="p-12 text-center text-white/50 text-sm">{t('vault.no_results')}</div>
                         ) : (
                             <table className="w-full text-sm text-left">
@@ -280,7 +268,7 @@ const Vault = ({ setAppError }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {filteredTools.map((tool, idx) => (
+                                    {tools.map((tool, idx) => (
                                         <tr key={idx} className={`hover:bg-white/[0.02] transition-colors group cursor-pointer ${!tool.is_active ? 'opacity-50' : ''}`} onClick={() => navigate(`/tool/${tool.tool_name.toLowerCase().replace(/\s+/g, '-')}`)}>
                                             {isAdmin && (
                                                 <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>

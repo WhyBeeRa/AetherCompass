@@ -198,9 +198,12 @@ export default function AdminVault() {
         try {
             setIsSubmitting(true);
             const token = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
-            const response = await apiFetch('/admin/benchmarks/trigger', {
+            const response = await apiFetch('/api/agents/metrics/run', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
             
             if (response.ok) {
@@ -227,9 +230,12 @@ export default function AdminVault() {
         try {
             setIsSubmitting(true);
             const token = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
-            const response = await apiFetch('/admin/discovery/trigger', {
+            const response = await apiFetch('/api/agents/scout/run?intent=Hot%20new%20AI%20tools', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
             
             if (response.ok) {

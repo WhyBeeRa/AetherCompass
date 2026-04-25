@@ -21,7 +21,10 @@ const ReviewQueue = () => {
       // Fetch Ready for Review
       console.log("[ReviewQueue] Fetching /admin/requests...");
       const resPending = await apiFetch('/admin/requests', {
-        headers: { 'Authorization': `Bearer ${idToken}` }
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (resPending.ok) {
@@ -34,7 +37,10 @@ const ReviewQueue = () => {
 
       // Fetch Live Scans
       const resLive = await apiFetch('/admin/live-scans', {
-        headers: { 'Authorization': `Bearer ${idToken}` }
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
       });
       
       if (resLive.ok) {
@@ -69,7 +75,10 @@ const ReviewQueue = () => {
       
       const res = await apiFetch(`${endpoint}?tool_name=${encodeURIComponent(toolName)}`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${idToken}` }
+        headers: { 
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (res.ok) {

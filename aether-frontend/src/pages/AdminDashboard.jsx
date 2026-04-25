@@ -51,7 +51,13 @@ const SystemPulse = () => {
 
   const fetchTelemetry = async () => {
     try {
-      const res = await apiFetch('/api/health');
+      const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
+      const res = await apiFetch('/api/health', {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setTelemetry(data);
@@ -65,7 +71,10 @@ const SystemPulse = () => {
     try {
       const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
       const resLogs = await apiFetch(`/admin/logs?log_type=${activeLog}&lines=50`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       if (resLogs.ok) {
         const dataLogs = await resLogs.json();
@@ -80,9 +89,12 @@ const SystemPulse = () => {
     try {
       const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
       
-      // Heartbeat Only
-      const resHb = await apiFetch('/admin/heartbeat', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      // Changed from /admin/heartbeat to /api/health as requested
+      const resHb = await apiFetch('/api/health', {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       if (resHb.ok) {
         const dataHb = await resHb.json();
@@ -101,51 +113,82 @@ const SystemPulse = () => {
     }
   };
 
-  useEffect(() => {
-    fetchDiagnostics();
-    fetchTelemetry();
-    fetchLogs();
-    
-    // Initialize WebSocket for Live Logs
-    const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
-    const wsHost = API_BASE.replace(/^https?:\/\//, '');
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/logs`;
-    
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    const heartbeatInterval = useRef(null);
+    const reconnectTimeout = useRef(null);
 
-    ws.onopen = () => {
-        setConnectionActive(true);
-        console.log("WebSocket connected to:", wsUrl);
-    };
-
-    ws.onmessage = (event) => {
-        const message = event.data;
-        setLogs(prev => {
-            const updated = [...prev, message];
-            return updated.slice(-200); // Keep last 200 lines
-        });
-    };
-
-    ws.onclose = () => {
-        setConnectionActive(false);
-        console.log("WebSocket disconnected");
-    };
-
-    ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        setConnectionActive(false);
-    };
-
-    const diagInterval = setInterval(fetchDiagnostics, 3000);
-    const telInterval = setInterval(fetchTelemetry, 10000);
-
-    return () => {
-      clearInterval(diagInterval);
-      clearInterval(telInterval);
+    const connectWS = () => {
+      // Clear any existing connection/timers
       if (wsRef.current) wsRef.current.close();
+      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+      if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+
+      const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
+      const wsHost = API_BASE.replace(/^https?:\/\//, '');
+      const wsUrl = `${wsProtocol}//${wsHost}/ws/logs`;
+      
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+          setConnectionActive(true);
+          console.log("WebSocket connected to:", wsUrl);
+          
+          // Start Heartbeat
+          heartbeatInterval.current = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'ping' }));
+              }
+          }, 30000);
+      };
+
+      ws.onmessage = (event) => {
+          const message = event.data;
+          try {
+              const data = JSON.parse(message);
+              if (data.type === 'pong') return; // Ignore pongs in log console
+          } catch (e) {
+              // Not JSON, treat as raw log line
+          }
+          
+          setLogs(prev => {
+              const updated = [...prev, message];
+              return updated.slice(-200); 
+          });
+      };
+
+      ws.onclose = () => {
+          setConnectionActive(false);
+          console.log("WebSocket disconnected. Retrying in 3s...");
+          if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+          
+          // Auto-reconnect
+          reconnectTimeout.current = setTimeout(connectWS, 3000);
+      };
+
+      ws.onerror = (err) => {
+          console.error("WebSocket error:", err);
+          ws.close();
+      };
     };
-  }, [activeLog]);
+
+    useEffect(() => {
+      fetchDiagnostics();
+      fetchTelemetry();
+      fetchLogs();
+      
+      connectWS();
+
+      const diagInterval = setInterval(fetchDiagnostics, 3000);
+      const telInterval = setInterval(fetchTelemetry, 10000);
+
+      return () => {
+        clearInterval(diagInterval);
+        clearInterval(telInterval);
+        if (wsRef.current) wsRef.current.close();
+        if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+        if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+      };
+    }, [activeLog]);
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -195,11 +238,14 @@ const SystemPulse = () => {
                 onClick={async () => {
                     try {
                     const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
-                    const res = await apiFetch('/admin/live-metrics/trigger', {
+                    const res = await apiFetch('/api/agents/metrics/run', {
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` }
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
                     });
-                        if (res.ok) alert("Live Pulse Refresh Triggered");
+                        if (res.ok) alert("Live Pulse Refresh Triggered (Metrics Agent)");
                         else alert("Manual Refresh Failed");
                     } catch (err) {
                         alert("Network error during pulse refresh");

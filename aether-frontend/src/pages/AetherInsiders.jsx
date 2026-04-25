@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Target, Trophy, Zap, Users, Star, CheckCircle } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { Link } from 'react-router-dom';
+import { apiFetch } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AetherInsiders = ({ setAppError }) => {
@@ -17,7 +18,7 @@ const AetherInsiders = ({ setAppError }) => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const leaderboardRes = await fetch(`${import.meta.env.VITE_API_URL}/community/leaderboard`);
+        const leaderboardRes = await apiFetch('/community/leaderboard');
         if (leaderboardRes.ok) {
           const lbData = await leaderboardRes.json();
           setLeaderboard(lbData);
@@ -32,7 +33,7 @@ const AetherInsiders = ({ setAppError }) => {
     const fetchProfile = async () => {
       try {
         const idToken = await currentUser.getIdToken();
-        const profileRes = await fetch(`${import.meta.env.VITE_API_URL}/community/profile`, {
+        const profileRes = await apiFetch('/community/profile', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${idToken}`,
@@ -61,7 +62,7 @@ const AetherInsiders = ({ setAppError }) => {
     setScouting(true);
     try {
       const idToken = await currentUser.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/community/contribute`, {
+      const res = await apiFetch('/community/contribute', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`,
@@ -76,7 +77,7 @@ const AetherInsiders = ({ setAppError }) => {
         setScoutSuccess(true);
         setScoutData({ name: '', url: '', description: '' });
         // Refresh leaderboard to show new points
-        const lbRes = await fetch(`${import.meta.env.VITE_API_URL}/community/leaderboard`);
+        const lbRes = await apiFetch('/community/leaderboard');
         if (lbRes.ok) setLeaderboard(await lbRes.json());
         
         // Close modal after 3 seconds
