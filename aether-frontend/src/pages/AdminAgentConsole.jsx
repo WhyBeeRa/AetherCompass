@@ -102,23 +102,23 @@ export default function AdminAgentConsole() {
 
       const payload = {
         name: result.name,
-        description: result.web_consensus || result.audit_notes,
+        description: result.executive_summary || result.web_consensus || result.audit_notes,
         website_url: url,
         intent_category: result.category,
         use_cases: result.use_cases || [],
         pros: result.pros || [],
         cons: result.cons || [],
-        accuracy: 5,
-        speed: 5,
-        value: 5,
-        ease_of_use: 5,
+        accuracy: result.accuracy || 4,
+        speed: result.speed || 4,
+        value: result.value || 4,
+        ease_of_use: result.ease_of_use || 4,
         pricing: result.pricing_model || "Unknown",
-        learning_curve: "Medium",
-        latency_label: "Unknown",
+        learning_curve: result.learning_curve || "Medium",
+        latency_label: result.pricing_details || "N/A",
         cost_label: result.pricing_details || "Unknown",
-        privacy_grade: "Unknown",
-        integration: "Web",
-        visual_quality: "Mid",
+        privacy_grade: "Enterprise Safe",
+        integration: "Web / API",
+        visual_quality: result.visual_quality || "Mid",
         trust_score: result.trust_score || 50
       };
 
@@ -255,7 +255,17 @@ export default function AdminAgentConsole() {
                 </div>
 
                 <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                  <p className="text-sm text-white/80 leading-relaxed"><span className="text-indigo-400 font-bold mr-2">Consensus:</span> {result.web_consensus}</p>
+                  <p className="text-sm text-white/80 leading-relaxed italic">
+                    <span className="text-indigo-400 font-bold not-italic mr-2">Summary:</span> 
+                    {result.executive_summary}
+                  </p>
+                </div>
+
+                <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                  <p className="text-sm text-white/80 leading-relaxed">
+                    <span className="text-indigo-400 font-bold mr-2">Consensus:</span> 
+                    {result.web_consensus}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -264,9 +274,23 @@ export default function AdminAgentConsole() {
                     <div className="text-sm text-white font-bold">{result.pricing_model}</div>
                   </div>
                   <div className="bg-white/5 p-3 rounded-xl">
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Pricing Details</div>
-                    <div className="text-sm text-white/80 truncate">{result.pricing_details || "N/A"}</div>
+                    <div className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Learning Curve</div>
+                    <div className="text-sm text-white font-bold">{result.learning_curve || "Medium"}</div>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Acc', val: result.accuracy },
+                    { label: 'Spd', val: result.speed },
+                    { label: 'Val', val: result.value },
+                    { label: 'UX', val: result.ease_of_use }
+                  ].map((m, i) => (
+                    <div key={i} className="bg-white/5 p-2 rounded-lg text-center border border-white/5">
+                      <div className="text-[8px] text-white/30 uppercase mb-1">{m.label}</div>
+                      <div className="text-xs font-bold text-white/90">{m.val}/5</div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

@@ -20,6 +20,15 @@ class DeepAuditorResult(BaseModel):
     cons: List[str] = Field(description="Top 3 cons or red flags.")
     use_cases: List[str] = Field(description="Top 3 use cases.")
     audit_notes: str = Field(description="Final verdict or critical warnings.")
+    
+    # New metrics for direct vault integration
+    accuracy: int = Field(default=4, ge=1, le=5, description="1-5 rating of output reliability.")
+    speed: int = Field(default=4, ge=1, le=5, description="1-5 rating of response time.")
+    value: int = Field(default=4, ge=1, le=5, description="1-5 rating of cost-effectiveness.")
+    ease_of_use: int = Field(default=4, ge=1, le=5, description="1-5 rating of user experience.")
+    learning_curve: str = Field(default="Medium", description="Very Easy, Medium, Hard, or Developers Only.")
+    visual_quality: str = Field(default="Mid", description="High, Mid, or Low.")
+    executive_summary: str = Field(description="A single punchy sentence: Sentence 1: Peak. Sentence 2: Trade-off.")
 
 async def fetch_page(client: httpx.AsyncClient, url: str) -> str:
     try:
