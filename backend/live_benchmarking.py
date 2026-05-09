@@ -93,11 +93,11 @@ class LiveMonitor:
                     resp = await client.get(website, timeout=10.0, follow_redirects=True)
                     latency = (time.time() - start_time) * 1000
                     
-                    # Rule: Handle 403 and 429 as Connection_Error with 0 score
+                    # Rule: Handle 403 and 429 as protected (Cloudflare/WAF)
                     if resp.status_code in [403, 429]:
-                        status = "Connection_Error"
+                        status = "protected"
                         latency = 0
-                        reliability_score = 0.0
+                        reliability_score = 100.0
                     elif resp.status_code >= 400:
                         status = "slow" if latency > 1500 else "online"
                         reliability_score = 0.0 # Error codes count as 0 reliability
@@ -165,14 +165,14 @@ class LiveMonitor:
                 return
 
             # 4. Calculate comparisons and save
-            active_metrics = [m for m in metrics if m.status not in ["offline", "Connection_Error"]]
+            active_metrics = [m for m in metrics if m.status not in ["offline", "Connection_Error", "protected"]]
             if active_metrics:
                 avg_latency = sum(m.latency_ms for m in active_metrics) / len(active_metrics)
             else:
                 avg_latency = 0
             
             for m in metrics:
-                if m.status not in ["offline", "Connection_Error"] and avg_latency > 0:
+                if m.status not in ["offline", "Connection_Error", "protected"] and avg_latency > 0:
                     m.comparison_vs_avg = round(((m.latency_ms - avg_latency) / avg_latency) * 100, 2)
                 else:
                     m.comparison_vs_avg = 0

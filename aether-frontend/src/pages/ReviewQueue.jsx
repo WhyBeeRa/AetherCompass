@@ -16,7 +16,7 @@ const ReviewQueue = () => {
   const fetchAll = async () => {
     try {
       if (!isLocal && !currentUser) return;
-      const idToken = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
+      const idToken = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
       
       // Fetch Ready for Review
       console.log("[ReviewQueue] Fetching /admin/requests...");
@@ -70,7 +70,7 @@ const ReviewQueue = () => {
 
   const handleAction = async (toolName, action) => {
     try {
-      const idToken = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
+      const idToken = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
       const endpoint = action === 'approve' ? '/admin/approve' : '/admin/reject';
       
       const res = await apiFetch(`${endpoint}?tool_name=${encodeURIComponent(toolName)}`, {

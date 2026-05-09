@@ -29,44 +29,74 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ReviewQueue from './ReviewQueue';
 import AdminAnalytics from './AdminAnalytics';
 import AdminVault from './AdminVault';
+import AdminAgentConsole from './AdminAgentConsole';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const SystemPulse = () => {
   const { currentUser } = useAuth();
-  const [heartbeat, setHeartbeat] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeLog, setActiveLog] = useState('tasks');
   const [isPulsing, setIsPulsing] = useState(false);
-  const [connectionActive, setConnectionActive] = useState(true);
+  const [connectionActive, setConnectionActive] = useState(false);
   const [telemetry, setTelemetry] = useState({
     ram_usage: 'N/A',
     db_status: 'N/A',
-    embedder: 'N/A'
+    embedder: 'N/A',
+    memory_usage_mb: 'N/A',
+    embedder_status: 'N/A',
+    timestamp: null
   });
   const terminalRef = useRef(null);
   const wsRef = useRef(null);
+  const heartbeatInterval = useRef(null);
+  const reconnectTimeout = useRef(null);
 
-  const fetchTelemetry = async () => {
+  // BUG-6 fix: Consolidated into single health fetch using /admin/heartbeat for richer data
+  const fetchHealthData = async () => {
     try {
       const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
-      const res = await apiFetch('/api/health', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+      // Fetch detailed heartbeat (admin endpoint with memory, embedder status, db)
+      const resHb = await apiFetch('/admin/heartbeat', { headers });
+      if (resHb.ok) {
+        const data = await resHb.json();
+        setTelemetry(prev => ({
+          ...prev,
+          memory_usage_mb: data.memory_usage_mb,
+          embedder_status: data.embedder_status,
+          db_status: data.database_status === 'CONNECTED' ? 'Connected' : data.database_status,
+          embedder: data.embedder_status === 'ACTIVE' ? 'Online' : data.embedder_status,
+          timestamp: data.timestamp
+        }));
+        setConnectionActive(true);
+        setIsPulsing(true);
+        setTimeout(() => setIsPulsing(false), 600);
+      } else {
+        // Fallback to public health endpoint if admin heartbeat fails
+        const resPub = await apiFetch('/api/health', { headers });
+        if (resPub.ok) {
+          const pubData = await resPub.json();
+          setTelemetry(prev => ({ ...prev, ...pubData }));
+          setConnectionActive(true);
+          setIsPulsing(true);
+          setTimeout(() => setIsPulsing(false), 600);
+        } else {
+          setConnectionActive(false);
         }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTelemetry(data);
       }
     } catch (err) {
-      console.error("Telemetry error:", err);
+      console.error("Health data error:", err);
+      setConnectionActive(false);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // REST-based log fetch (for tab switching)
   const fetchLogs = async () => {
     try {
       const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
@@ -85,110 +115,78 @@ const SystemPulse = () => {
     }
   };
 
-  const fetchDiagnostics = async () => {
-    try {
-      const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
-      
-      // Changed from /admin/heartbeat to /api/health as requested
-      const resHb = await apiFetch('/api/health', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (resHb.ok) {
-        const dataHb = await resHb.json();
-        setHeartbeat(dataHb);
-        setIsPulsing(true);
-        setTimeout(() => setIsPulsing(false), 600);
+  // BUG-13 fix: Strip trailing slashes from API_BASE to prevent double-slash in WS URL
+  const connectWS = () => {
+    if (wsRef.current) wsRef.current.close();
+    if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+    if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+
+    const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
+    const wsHost = API_BASE.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/logs`;
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
         setConnectionActive(true);
-      } else {
+        console.log("WebSocket connected to:", wsUrl);
+        
+        heartbeatInterval.current = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+    };
+
+    ws.onmessage = (event) => {
+        const message = event.data;
+        try {
+            const data = JSON.parse(message);
+            if (data.type === 'pong') return;
+        } catch (e) {
+            // Not JSON, treat as raw log line
+        }
+        
+        setLogs(prev => {
+            const updated = [...prev, message];
+            return updated.slice(-200); 
+        });
+    };
+
+    ws.onclose = () => {
         setConnectionActive(false);
-      }
-    } catch (err) {
-      console.error("Diagnostic error:", err);
-      setConnectionActive(false);
-    } finally {
-      setLoading(false);
-    }
+        console.log("WebSocket disconnected. Retrying in 5s...");
+        if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+        reconnectTimeout.current = setTimeout(connectWS, 5000);
+    };
+
+    ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        ws.close();
+    };
   };
 
-    const heartbeatInterval = useRef(null);
-    const reconnectTimeout = useRef(null);
+  // BUG-7 fix: WebSocket connection — independent of activeLog tab
+  useEffect(() => {
+    fetchHealthData();
+    connectWS();
 
-    const connectWS = () => {
-      // Clear any existing connection/timers
+    // BUG-8 fix: Reduced from 3s to 15s
+    const healthInterval = setInterval(fetchHealthData, 15000);
+
+    return () => {
+      clearInterval(healthInterval);
       if (wsRef.current) wsRef.current.close();
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
       if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
-
-      const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
-      const wsHost = API_BASE.replace(/^https?:\/\//, '');
-      const wsUrl = `${wsProtocol}//${wsHost}/ws/logs`;
-      
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-          setConnectionActive(true);
-          console.log("WebSocket connected to:", wsUrl);
-          
-          // Start Heartbeat
-          heartbeatInterval.current = setInterval(() => {
-              if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify({ type: 'ping' }));
-              }
-          }, 30000);
-      };
-
-      ws.onmessage = (event) => {
-          const message = event.data;
-          try {
-              const data = JSON.parse(message);
-              if (data.type === 'pong') return; // Ignore pongs in log console
-          } catch (e) {
-              // Not JSON, treat as raw log line
-          }
-          
-          setLogs(prev => {
-              const updated = [...prev, message];
-              return updated.slice(-200); 
-          });
-      };
-
-      ws.onclose = () => {
-          setConnectionActive(false);
-          console.log("WebSocket disconnected. Retrying in 3s...");
-          if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
-          
-          // Auto-reconnect
-          reconnectTimeout.current = setTimeout(connectWS, 3000);
-      };
-
-      ws.onerror = (err) => {
-          console.error("WebSocket error:", err);
-          ws.close();
-      };
     };
+  }, []);
 
-    useEffect(() => {
-      fetchDiagnostics();
-      fetchTelemetry();
-      fetchLogs();
-      
-      connectWS();
-
-      const diagInterval = setInterval(fetchDiagnostics, 3000);
-      const telInterval = setInterval(fetchTelemetry, 10000);
-
-      return () => {
-        clearInterval(diagInterval);
-        clearInterval(telInterval);
-        if (wsRef.current) wsRef.current.close();
-        if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
-        if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
-      };
-    }, [activeLog]);
+  // BUG-7 fix: REST logs — re-fetch only on tab change
+  useEffect(() => {
+    fetchLogs();
+  }, [activeLog]);
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -196,6 +194,11 @@ const SystemPulse = () => {
         terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [logs]);
+
+  // BUG-5 fix: Parse RAM percentage as number for progress bar
+  const ramPercent = telemetry.ram_usage && telemetry.ram_usage !== 'N/A' 
+    ? parseFloat(telemetry.ram_usage) 
+    : 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -210,17 +213,19 @@ const SystemPulse = () => {
           </div>
           
           <div className="space-y-4">
+            {/* BUG-3 fix: Dynamic status based on connectionActive state */}
             <div className="flex justify-between items-center text-sm">
                 <span className="text-white/40">Status</span>
-                <span className="flex items-center gap-2 text-emerald-400 font-bold">
-                    <div className={`w-2 h-2 rounded-full bg-emerald-500 transition-all duration-300 ${isPulsing ? 'scale-150 shadow-[0_0_10px_#10b981]' : 'scale-100 shadow-none'}`} />
-                    ONLINE
+                <span className={`flex items-center gap-2 font-bold ${connectionActive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${connectionActive ? 'bg-emerald-500' : 'bg-rose-500'} transition-all duration-300 ${isPulsing ? 'scale-150 shadow-[0_0_10px_#10b981]' : 'scale-100 shadow-none'}`} />
+                    {connectionActive ? 'ONLINE' : 'OFFLINE'}
                 </span>
             </div>
+            {/* BUG-6 fix: Updated label from ONNX to Gemini */}
             <div className="flex justify-between items-center text-sm">
-                <span className="text-white/40">Embedder (ONNX)</span>
-                <span className={`font-bold ${telemetry.embedder === 'Online' ? 'text-cyan-400' : 'text-rose-400'}`}>
-                    {telemetry.embedder}
+                <span className="text-white/40">Embedder (Gemini)</span>
+                <span className={`font-bold ${telemetry.embedder === 'Online' || telemetry.embedder_status === 'ACTIVE' ? 'text-cyan-400' : 'text-rose-400'}`}>
+                    {telemetry.embedder_status !== 'N/A' ? telemetry.embedder_status : telemetry.embedder}
                 </span>
             </div>
             <div className="flex justify-between items-center text-sm">
@@ -231,7 +236,7 @@ const SystemPulse = () => {
             </div>
              <div className="flex justify-between items-center text-sm mb-4">
                 <span className="text-white/40">RAM Usage</span>
-                <span className="text-white/80 font-mono">{telemetry.ram_usage}</span>
+                <span className="text-white/80 font-mono">{telemetry.ram_usage !== 'N/A' ? telemetry.ram_usage : (telemetry.memory_usage_mb !== 'N/A' ? `${telemetry.memory_usage_mb} MB` : 'N/A')}</span>
             </div>
 
             <button 
@@ -269,27 +274,35 @@ const SystemPulse = () => {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* BUG-5 fix: Parse RAM percentage as number for reliable animation */}
             <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
                 <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">System Load (RAM)</div>
-                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                <div className="flex items-center gap-3">
+                  <div className="h-2 flex-1 bg-white/5 rounded-full overflow-hidden">
                     <motion.div 
                         initial={{ width: 0 }} 
-                        animate={{ width: telemetry.ram_usage !== 'N/A' ? telemetry.ram_usage : '0%' }} 
-                        className="h-full bg-indigo-500" 
+                        animate={{ width: `${ramPercent}%` }} 
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                        className={`h-full rounded-full ${ramPercent > 80 ? 'bg-rose-500' : ramPercent > 60 ? 'bg-amber-500' : 'bg-indigo-500'}`} 
                     />
+                  </div>
+                  <span className="text-xs font-mono text-white/60 min-w-[40px] text-right">{ramPercent > 0 ? `${ramPercent}%` : 'N/A'}</span>
+                </div>
+            </div>
+             {/* BUG-4 fix: Wired to real data instead of hardcoded values */}
+             <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Process Memory</div>
+                <div className="text-xl font-mono font-bold text-white">{telemetry.memory_usage_mb !== 'N/A' ? `${telemetry.memory_usage_mb}` : '—'} <span className="text-xs text-white/20">MB</span></div>
+            </div>
+             <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Embedder Status</div>
+                <div className={`text-sm font-mono font-bold ${telemetry.embedder_status === 'ACTIVE' ? 'text-emerald-400' : telemetry.embedder_status === 'LOADING' ? 'text-amber-400' : 'text-rose-400'}`}>
+                  {telemetry.embedder_status !== 'N/A' ? telemetry.embedder_status : '—'} <span className="text-xs text-white/20">{telemetry.embedder_status === 'ACTIVE' ? 'Gemini API' : ''}</span>
                 </div>
             </div>
              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Worker Latency</div>
-                <div className="text-xl font-mono font-bold text-white">0.42s <span className="text-xs text-white/20">avg</span></div>
-            </div>
-             <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Open Threads</div>
-                <div className="text-xl font-mono font-bold text-white">12 <span className="text-xs text-emerald-500">stable</span></div>
-            </div>
-             <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Last Error</div>
-                <div className="text-[10px] font-mono text-rose-400/80 truncate">Gemini 503: High Demand (resolved)</div>
+                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Last Heartbeat</div>
+                <div className="text-[10px] font-mono text-white/60 truncate">{telemetry.timestamp ? new Date(telemetry.timestamp).toLocaleTimeString() : '—'}</div>
             </div>
           </div>
         </div>
@@ -359,7 +372,7 @@ export default function AdminDashboard() {
     } else if (currentUser && !isAdmin) {
       navigate('/');
     }
-  }, [currentUser, isAdmin, navigate, isLocal]);
+  }, [currentUser, isAdmin, navigate]);
 
   if (!isLocal && (!currentUser || !isAdmin)) return null;
 
@@ -368,6 +381,7 @@ export default function AdminDashboard() {
   const menuItems = [
     { id: 'pulse', label: 'System Pulse', icon: Activity, path: '/admin' },
     { id: 'review', label: 'Review Queue', icon: Layers, path: '/admin/requests' },
+    { id: 'agent', label: 'Agent Console', icon: Terminal, path: '/admin/agent' },
     { id: 'manual', label: 'Manual Entry', icon: PlusSquare, path: '/admin/vault' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
   ];
@@ -465,6 +479,7 @@ export default function AdminDashboard() {
                     <Routes>
                         <Route path="/" element={<SystemPulse />} />
                         <Route path="/requests" element={<ReviewQueue />} />
+                        <Route path="/agent" element={<AdminAgentConsole />} />
                         <Route path="/analytics" element={<AdminAnalytics />} />
                         <Route path="/vault" element={<AdminVault />} />
                     </Routes>

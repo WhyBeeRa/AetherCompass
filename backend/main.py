@@ -18,6 +18,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Request, Depends
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Optional
 from firebase_admin import auth as firebase_auth
@@ -29,6 +30,7 @@ from community_logic import check_for_badges
 from models import UserProfile, Badge, ToolContribution, LiveMetric
 from pydantic import BaseModel
 from admin_auditor import run_lean_audit
+from admin_agent import run_deep_audit_stream
 from agents.scout import ScoutAgent
 import psutil
 from logger_utils import log_streamer, log_terminal
@@ -362,7 +364,8 @@ async def add_manual_tool(tool_data: ManualToolEntry, request: Request, admin_em
             executive_summary=tool_data.description,
             pros=tool_data.pros,
             cons=tool_data.cons,
-            use_cases=tool_data.use_cases
+            use_cases=tool_data.use_cases,
+            website_url=tool_data.website_url
         )
 
         gallery = []
@@ -402,6 +405,13 @@ async def add_manual_tool(tool_data: ManualToolEntry, request: Request, admin_em
         print(f"[Admin Error] Failed to add tool: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/admin/agent/investigate", dependencies=[Depends(verify_admin_user)])
+async def investigate_tool_stream(request: AuditRequest):
+    """
+    Streams the progress of the Deep Auditor (Agent Console).
+    """
+    return StreamingResponse(run_deep_audit_stream(request.url), media_type="text/event-stream")
+
 @app.post("/admin/auditor/manual", dependencies=[Depends(verify_admin_user)])
 async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(verify_admin_user)):
     """
@@ -431,7 +441,8 @@ async def manual_vault_audit(request: AuditRequest, admin_email: str = Depends(v
             pros=[],
             cons=[],
             use_cases=[data["category"]],
-            audit_notes=data["audit_notes"]
+            audit_notes=data["audit_notes"],
+            website_url=request.url
         )
 
         audit_log = AuditLog(
@@ -664,6 +675,7 @@ def get_leaderboard():
     return vault.get_user_rankings(limit=20)
 
 async def background_audit_scouted_tool(task_id: int, url: str, description: str, submitter_email: str, suggested_name: str = None):
+    log_file = Path(__file__).parent / "background_tasks.log"
     await log_terminal(f"STARTING AUDIT: {url} (suggested name: {suggested_name}, requested by {submitter_email})")
 
     try:
@@ -712,7 +724,8 @@ async def background_audit_scouted_tool(task_id: int, url: str, description: str
             pros=[],
             cons=[],
             use_cases=[data.get("category", "General")],
-            audit_notes=data.get("audit_notes", "")
+            audit_notes=data.get("audit_notes", ""),
+            website_url=url
         )
 
         audit_log = AuditLog(

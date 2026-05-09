@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, HttpUrl, field_validator, field_validator, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -158,6 +158,7 @@ class LabAnalysis(BaseModel):
     
     # Semantic Mapping
     job_to_be_done: List[str] = Field(..., description="Broad categories (e.g. 'Lead Enrichment', 'Viral Video Creation')")
+    website_url: Optional[str] = Field(default=None, description="The URL of the tool for live benchmarking")
     
     # THE AETHER INTENT ENGINE
     intents_mapped: List[IntentMapping] = Field(default_factory=list, description="Specific intents this tool solves and how well")
@@ -229,6 +230,7 @@ class ManualToolEntry(BaseModel):
     cons: List[str]
     use_cases: List[str] = Field(default_factory=list)
     trust_score: int = Field(..., ge=10, le=100)
+    website_url: Optional[str] = None
     
     # Extra fields required for internal DB conversion
     intent_category: str
@@ -247,9 +249,6 @@ class ManualToolEntry(BaseModel):
     image_url: Optional[str] = None
     
     # Comparison Fields
-    latency_label: str = "2.4s"
-    cost_label: str = "$0.01 / task"
-    privacy_grade: str = "Enterprise Safe"
     integration: str = "Web / API"
 
     @field_validator('pros', 'cons', 'use_cases', mode='before')

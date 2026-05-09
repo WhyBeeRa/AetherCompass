@@ -154,15 +154,23 @@ export default function AdminVault() {
         setSubmitResult(null);
 
         try {
-            const token = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
+            const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
             
+            // BUG-10 fix: Split comma-separated strings into arrays for backend
+            const payload = {
+                ...formData,
+                pros: typeof formData.pros === 'string' ? formData.pros.split(',').map(s => s.trim()).filter(Boolean) : formData.pros,
+                cons: typeof formData.cons === 'string' ? formData.cons.split(',').map(s => s.trim()).filter(Boolean) : formData.cons,
+                use_cases: typeof formData.use_cases === 'string' ? formData.use_cases.split(',').map(s => s.trim()).filter(Boolean) : formData.use_cases,
+            };
+
             const response = await apiFetch('/admin/vault/tool', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -197,7 +205,7 @@ export default function AdminVault() {
     const triggerLiveBenchmark = async () => {
         try {
             setIsSubmitting(true);
-            const token = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
+            const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
             const response = await apiFetch('/api/agents/metrics/run', {
                 method: 'POST',
                 headers: { 
@@ -229,7 +237,7 @@ export default function AdminVault() {
     const triggerDiscoveryScan = async () => {
         try {
             setIsSubmitting(true);
-            const token = isLocal ? "LOCAL_DEV_TOKEN" : await currentUser.getIdToken();
+            const token = isLocal ? "dev-admin-token" : await currentUser.getIdToken();
             const response = await apiFetch('/api/agents/scout/run?intent=Hot%20new%20AI%20tools', {
                 method: 'POST',
                 headers: { 
