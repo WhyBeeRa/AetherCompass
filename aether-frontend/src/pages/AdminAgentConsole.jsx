@@ -45,7 +45,17 @@ export default function AdminAgentConsole() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errStr = `status: ${response.status}`;
+        try {
+          const errObj = await response.json();
+          errStr += ` - ${errObj.detail || JSON.stringify(errObj)}`;
+        } catch (e) {
+          try {
+             const errText = await response.text();
+             errStr += ` - ${errText}`;
+          } catch(e2) {}
+        }
+        throw new Error(`HTTP error! ${errStr}`);
       }
 
       const reader = response.body.getReader();

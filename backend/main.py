@@ -900,10 +900,7 @@ async def get_system_heartbeat(admin_email: str = Depends(verify_admin_user)):
         if eng.is_ready():
             embedder_status = "ACTIVE"
         else:
-            # Check if model files exist in cache
-            cache_dir = Path(eng.CACHE_DIR)
-            model_exists = (cache_dir / "models--BAAI--bge-small-en-v1.5").exists()
-            embedder_status = "LOADING" if model_exists else "MISSING_MODEL"
+            embedder_status = "NO_API_KEY"
     except Exception as e:
         print(f"[Heartbeat] Embedder check failed: {e}")
         embedder_status = "ERROR"
@@ -931,14 +928,21 @@ async def get_api_health():
     Public health check for Telemetry.
     Returns RAM usage, DB status, and Gemini API status.
     """
-    # 1. RAM Usage
+    # 1. RAM Usage (system-wide)
     try:
         ram = psutil.virtual_memory()
         ram_usage = f"{ram.percent}%"
     except Exception:
         ram_usage = "N/A"
 
-    # 2. Database Status (SQLAlchemy/SQLite)
+    # 2. Process Memory (this backend process)
+    try:
+        process = psutil.Process(os.getpid())
+        memory_usage_mb = round(process.memory_info().rss / 1024 / 1024, 2)
+    except Exception:
+        memory_usage_mb = "N/A"
+
+    # 3. Database Status (SQLite)
     db_status = "Disconnected"
     try:
         vault.get_stats()
@@ -946,15 +950,26 @@ async def get_api_health():
     except Exception:
         db_status = "Error"
 
-    # 3. Gemini API Status
+    # 4. Embedder Status
+    embedder_status = "UNKNOWN"
     gemini_status = "Offline"
-    if os.getenv("GEMINI_API_KEY"):
-        gemini_status = "Online"
+    try:
+        from local_embedder import LocalEmbeddingEngine
+        eng = LocalEmbeddingEngine.get_instance()
+        if eng.is_ready():
+            embedder_status = "ACTIVE"
+            gemini_status = "Online"
+        else:
+            embedder_status = "NO_API_KEY"
+    except Exception:
+        embedder_status = "ERROR"
 
     return {
         "ram_usage": ram_usage,
+        "memory_usage_mb": memory_usage_mb,
         "db_status": db_status,
         "embedder": gemini_status,
+        "embedder_status": embedder_status,
         "timestamp": datetime.now().isoformat()
     }
 

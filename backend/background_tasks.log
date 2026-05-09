@@ -40,3 +40,5 @@
 [2026-05-09 13:05:05.119794]   [online] cursor: 294.83ms | Reliability: 97.05%
 [2026-05-09 13:05:05.124046]   [protected] perplexity: 0.0ms | Reliability: 100.0%
 [2026-05-09 13:05:05.129253] Benchmark Cycle Complete. 4 metrics updated.
+[2026-05-09 10:40:30.548695] [SYSTEM] Aether Kernel Online - Command Center Linked
+[2026-05-09 10:40:30.557207] [SYSTEM] GEMINI_API_KEY detected. Agent brains ready.
