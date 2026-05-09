@@ -91,13 +91,22 @@ def verify_admin_user(authorization: str = Header(None)) -> str:
         return "admin@aethercompass.local"
 
     if not authorization or not authorization.startswith("Bearer "):
+        print(f"[AUTH] Missing or malformed Authorization header. Got: {repr(authorization[:30]) if authorization else 'None'}")
         raise HTTPException(status_code=401, detail="Missing Token")
     
     token = authorization.split(" ")[1]
     
+    # Diagnostic: Check if Firebase is actually initialized
+    if not is_firebase_ready:
+        print(f"[AUTH CRITICAL] Firebase Admin SDK is NOT initialized! Error: {firebase_init_error}")
+        raise HTTPException(status_code=401, detail=f"Firebase not initialized: {firebase_init_error}")
+    
     # Parse admin emails from env
     admin_emails_str = os.getenv("ADMIN_EMAILS", "")
     admin_emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
+    
+    if not admin_emails:
+        print("[AUTH WARNING] ADMIN_EMAILS env var is empty or not set!")
 
     try:
         decoded_token = auth.verify_id_token(token)
@@ -105,13 +114,17 @@ def verify_admin_user(authorization: str = Header(None)) -> str:
         admin_emails_lower = [e.lower() for e in admin_emails]
         
         if email not in admin_emails_lower:
-            print(f"[Auth] Access denied for {email}. Not in admin list.")
+            print(f"[Auth] Access denied for {email}. Not in admin list: {admin_emails_lower}")
             raise HTTPException(status_code=403, detail=f"Not Authorized: {email} is not an admin")
             
+        print(f"[AUTH] Admin verified: {email}")
         return email
         
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[Auth Error] {e}")
+        print(f"[Auth Error] Token verification failed: {type(e).__name__}: {e}")
+        print(f"[Auth Error] Token preview: {token[:20]}...{token[-10:]}")
         error_msg = str(e)
         if "expired" in error_msg.lower():
             raise HTTPException(status_code=401, detail="Token Expired. Please re-login")
