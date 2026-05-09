@@ -24,10 +24,22 @@ class DeepAuditorResult(BaseModel):
 async def fetch_page(client: httpx.AsyncClient, url: str) -> str:
     try:
         response = await client.get(url, follow_redirects=True, timeout=10.0)
-        if response.status_code == 200:
-            return response.text
+        text = response.text
+        # Check if we hit Cloudflare anti-bot challenge
+        if response.status_code == 200 and "Just a moment..." not in text and "cf-browser-verification" not in text:
+            return text
     except Exception:
         pass
+        
+    # Fallback to Jina Reader API (Bypasses bot protection and renders JS for LLMs)
+    try:
+        jina_url = f"https://r.jina.ai/{url}"
+        response = await client.get(jina_url, follow_redirects=True, timeout=15.0)
+        if response.status_code == 200:
+            return response.text # Returns Markdown, which is perfect for the prompt
+    except Exception:
+        pass
+        
     return ""
 
 async def run_deep_audit_stream(url: str):
