@@ -16,5 +16,13 @@ const normalizeUrl = (path) => {
 export const apiFetch = (path, options = {}) => {
   const url = normalizeUrl(path);
   console.log(`[apiFetch] Calling: ${url}`); // Debugging help
+  
+  if (path.includes('/admin/')) {
+    options.headers = {
+      ...options.headers,
+      'X-Admin-Key': import.meta.env.VITE_ADMIN_API_KEY || ''
+    };
+  }
+  
   return fetch(url, options);
 };

@@ -15,17 +15,19 @@ router = APIRouter(
 vault = AetherVault()
 UNSPLASH_PATTERN = re.compile(r"https?://images\.unsplash\.com/", re.IGNORECASE)
 
-def verify_bridge_key(authorization: str = Header(None)):
+def verify_bridge_key(authorization: str = Header(None), x_admin_key: str = Header(None)):
     """Simple strong API key validation for the server-to-server bridge."""
     expected_key = os.getenv("ADMIN_API_KEY")
     if not expected_key:
         # Fallback to dev mode if env is not fully configured, though in prod it should be set
         expected_key = "dev_secret_bridge_key_123!"
         
-    print(f"[BRIDGE_DEBUG] Received auth header: {authorization}")
+    print(f"[BRIDGE_DEBUG] Received auth header: {authorization}, x_admin_key: {x_admin_key}")
     print(f"[BRIDGE_DEBUG] Expected key: {expected_key}")
         
     # Check if header matches (could be passed as Bearer or just raw)
+    if x_admin_key == expected_key:
+        return True
     if authorization == expected_key or authorization == f"Bearer {expected_key}":
         return True
         

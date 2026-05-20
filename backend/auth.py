@@ -79,11 +79,17 @@ def initialize_firebase_admin():
 # Attempt initialization
 initialize_firebase_admin()
 
-def verify_admin_user(authorization: str = Header(None)) -> str:
+def verify_admin_user(authorization: str = Header(None), x_admin_key: str = Header(None)) -> str:
     """
     FastAPI Dependency that extracts the Firebase Bearer token,
     verifies it, checks if the email is an admin, and returns the email.
+    Also accepts a valid X-Admin-Key matching ADMIN_API_KEY.
     """
+    expected_key = os.getenv("ADMIN_API_KEY")
+    if expected_key and x_admin_key == expected_key:
+        print("[AUTH] Admin access granted via X-Admin-Key bypass.")
+        return "api-key-admin@aethercompass.local"
+
     # [TEMPORARY BYPASS] For local development only.
     # Allows bypassing Firebase auth on dev machines.
     if authorization == "Bearer dev-admin-token":
