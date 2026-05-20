@@ -157,7 +157,12 @@ const Vault = ({ setAppError }) => {
         try {
             setAuditPending(prev => ({ ...prev, [toolName]: true }));
             // Bridge API expects the static ADMIN_API_KEY, not a Firebase user token
-            const token = import.meta.env.VITE_ADMIN_API_KEY;
+            let token = import.meta.env.VITE_ADMIN_API_KEY;
+            if (!token) {
+                console.warn("VITE_ADMIN_API_KEY is not defined in frontend environment variables! Using fallback.");
+                token = "dev_secret_bridge_key_123!";
+            }
+            
             const res = await apiFetch(`/api/admin/bridge/trigger/${encodeURIComponent(toolName.toLowerCase())}`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
