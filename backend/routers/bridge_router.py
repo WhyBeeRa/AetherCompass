@@ -22,6 +22,9 @@ def verify_bridge_key(authorization: str = Header(None)):
         # Fallback to dev mode if env is not fully configured, though in prod it should be set
         expected_key = "dev_secret_bridge_key_123!"
         
+    print(f"[BRIDGE_DEBUG] Received auth header: {authorization}")
+    print(f"[BRIDGE_DEBUG] Expected key: {expected_key}")
+        
     # Check if header matches (could be passed as Bearer or just raw)
     if authorization == expected_key or authorization == f"Bearer {expected_key}":
         return True
