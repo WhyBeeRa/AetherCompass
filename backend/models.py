@@ -101,6 +101,8 @@ class VisualQuality(str, Enum):
     HIGH = "High" # TV/Movie quality, indistinguishable from reality
     MID = "Mid"   # Good for social media, obvious AI artifacts
     LOW = "Low"   # Glitchy, toy-like
+    NOT_APPLICABLE = "Not Applicable" # Text-based or non-visual tools
+    NA = "N/A" # Text-based or non-visual tools
 
 class ToolMetrics(BaseModel):
     """

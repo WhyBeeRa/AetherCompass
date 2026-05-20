@@ -27,7 +27,7 @@ class DeepAuditorResult(BaseModel):
     value: int = Field(default=4, ge=1, le=5, description="1-5 rating of cost-effectiveness.")
     ease_of_use: int = Field(default=4, ge=1, le=5, description="1-5 rating of user experience.")
     learning_curve: str = Field(default="Medium", description="Very Easy, Medium, Hard, or Developers Only.")
-    visual_quality: str = Field(default="Mid", description="High, Mid, or Low.")
+    visual_quality: str = Field(default="Not Applicable", description="High, Mid, Low, Not Applicable, or N/A.")
     executive_summary: str = Field(description="2-3 sentences. Objective, cold, and focusing on actual utility and flaws.")
     time_to_value: str = Field(description="Short string (e.g., 'Hours', 'Days', 'Requires heavy onboarding').")
     privacy_grade: str = Field(description="A, B, C, D, or F based on enterprise safety.")
