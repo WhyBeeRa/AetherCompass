@@ -35,6 +35,9 @@ from agents.scout import ScoutAgent
 import psutil
 from logger_utils import log_streamer, log_terminal
 from fastapi import WebSocket, WebSocketDisconnect
+from routers.abc_tom_router import router as abc_tom_router
+from routers.factory_router import router as factory_router
+from routers.bridge_router import router as bridge_router
 
 class AuditRequest(BaseModel):
     url: str
@@ -61,6 +64,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount ABC-TOM Engine Router
+app.include_router(abc_tom_router)
+
+# Mount Local AI Factory Router (local admin only)
+app.include_router(factory_router)
+
+# Mount Prod-to-Local Bridge Router
+app.include_router(bridge_router)
 
 def get_current_user(authorization: str = Header(None)) -> Dict:
     """
@@ -103,6 +115,94 @@ async def startup_event():
     
     # [Liveliness Indicator] Signal kernel status to the terminal
     await log_terminal("[SYSTEM] Aether Kernel Online - Command Center Linked")
+    
+    # --- Local AI Factory Engine (BackgroundScheduler) ---
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from local_ai_factory.engine import start_engine as start_factory_engine
+        if start_factory_engine():
+            await log_terminal("[FACTORY] AI Factory Engine started - Auditor cycle every 5 min")
+            print("[FACTORY] AI Factory Engine initialized successfully")
+        else:
+            await log_terminal("[FACTORY] AI Factory Engine failed to start (check logs)")
+    except ImportError as ie:
+        print(f"[FACTORY] Could not import factory engine: {ie}")
+        await log_terminal("[FACTORY] Engine not available (import error)")
+    except Exception as fe:
+        print(f"[FACTORY] Engine startup error: {fe}")
+    # --- End Factory Engine ---
+    
+    # --- ABC-TOM Auditor Background Worker (APScheduler) ---
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from ai_engine.agent_parser import (
+            construct_agent_prompt, append_to_decisions, list_agents
+        )
+
+        async def auditor_periodic_task():
+            """
+            Periodic task that simulates the Auditor workflow:
+            1. Load auditor agent instructions via the parser
+            2. Query vault.db for tools needing review (is_active=0)
+            3. Simulate decision-making and log to M-memory/decisions.md
+            """
+            try:
+                prompt = construct_agent_prompt("auditor-agent.md")
+                await log_terminal("[ABC-TOM] Auditor cycle started")
+
+                # Query vault for pending tools
+                pending = vault.get_pending_tools()
+                if not pending:
+                    await log_terminal("[ABC-TOM] Auditor: No pending tools to review")
+                    return
+
+                reviewed = 0
+                for tool in pending[:5]:  # Process max 5 per cycle
+                    tool_name = tool.get("tool_name", "Unknown")
+                    trust_score = tool.get("trust_score", 0)
+
+                    # Simulated decision logic based on agent criteria
+                    if trust_score >= 60:
+                        action = "APPROVE"
+                        reason = f"Trust score {trust_score} meets threshold"
+                    elif trust_score < 30:
+                        action = "FLAG"
+                        reason = f"Trust score {trust_score} below minimum. Needs manual review."
+                    else:
+                        action = "FLAG"
+                        reason = f"Trust score {trust_score} in review range (30-59)"
+
+                    from datetime import datetime as dt
+                    entry = (
+                        f"\n## [{dt.now().strftime('%Y-%m-%d %H:%M')}] Audit Decision\n"
+                        f"- Tool: {tool_name}\n"
+                        f"- Action: {action}\n"
+                        f"- Trust Score: {trust_score}\n"
+                        f"- Reason: {reason}\n"
+                    )
+                    append_to_decisions(entry)
+                    reviewed += 1
+
+                await log_terminal(f"[ABC-TOM] Auditor cycle complete: {reviewed} tools reviewed")
+
+            except FileNotFoundError:
+                await log_terminal("[ABC-TOM] Auditor agent file not found. Skipping cycle.")
+            except Exception as e:
+                await log_terminal(f"[ABC-TOM] Auditor error: {str(e)}")
+
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(auditor_periodic_task, 'interval', minutes=30, id='abc_tom_auditor')
+        scheduler.start()
+        await log_terminal("[ABC-TOM] APScheduler started - Auditor runs every 30 minutes")
+        print("[ABC-TOM] APScheduler initialized successfully")
+
+    except ImportError:
+        print("[ABC-TOM] APScheduler not installed. Background auditor disabled.")
+        await log_terminal("[ABC-TOM] APScheduler not available. Install with: pip install apscheduler")
+    except Exception as e:
+        print(f"[ABC-TOM] Scheduler setup error: {e}")
+    # --- End ABC-TOM Worker ---
     
     # Check for critical environment variables
     if not os.getenv("GEMINI_API_KEY"):

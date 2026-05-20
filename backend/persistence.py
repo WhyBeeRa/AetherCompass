@@ -75,6 +75,12 @@ class AetherVault:
         except sqlite3.OperationalError:
              pass # Column already exists
 
+        # Migration: Add audit_pending column for Local Factory polling bridge
+        try:
+             c.execute("ALTER TABLE verified_tools ADD COLUMN audit_pending INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+             pass # Column already exists
+
         # 2. Audit History (The Trail)
         c.execute('''CREATE TABLE IF NOT EXISTS audit_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -658,3 +664,99 @@ class AetherVault:
         conn.commit()
         conn.close()
         print(f"[Vault] Pruned metrics older than {hours} hours.")
+
+    # --- Phase 3: Bridge Architecture ---
+    
+    def get_audit_pending_tools(self) -> List[Dict]:
+        """Fetches all tools with audit_pending = 1 for the Local AI Factory to process."""
+        conn = self._get_conn()
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("""SELECT tool_name, trust_score, analysis_json 
+                     FROM verified_tools 
+                     WHERE audit_pending = 1""")
+        rows = c.fetchall()
+        conn.close()
+        
+        results = []
+        for row in rows:
+            row_dict = dict(row)
+            tool_name = row_dict['tool_name']
+            slug_id = tool_name.strip().lower().replace(' ', '-')
+            results.append({
+                "id": slug_id,
+                "tool_name": tool_name,
+                "trust_score": row_dict['trust_score'],
+                "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {}
+            })
+        return results
+
+    def set_audit_pending(self, tool_id: str, pending: bool) -> bool:
+        """Sets the audit_pending flag for a specific tool."""
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        # We need to find the exact tool name based on the slug tool_id or tool_name
+        search_pattern = f"%{tool_id.lower()}%"
+        c.execute("SELECT tool_name FROM verified_tools WHERE lower(tool_name) = ? OR replace(lower(tool_name), ' ', '-') = ?", 
+                  (tool_id.lower(), tool_id.lower()))
+        row = c.fetchone()
+        
+        if not row:
+            conn.close()
+            return False
+            
+        actual_name = row[0]
+        c.execute("UPDATE verified_tools SET audit_pending = ? WHERE tool_name = ?", (1 if pending else 0, actual_name))
+        conn.commit()
+        conn.close()
+        return True
+
+    def apply_bridge_audit_update(self, tool_id: str, trust_score: float, executive_summary: str, 
+                                  time_to_value: str, privacy_grade: str, skill_multiplier: str) -> bool:
+        """Applies the structured data from the Local Factory and unsets audit_pending."""
+        import re
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        c.execute("SELECT tool_name, analysis_json, gallery_json FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = ? OR lower(tool_name) = ?", 
+                  (tool_id.lower(), tool_id.lower()))
+        row = c.fetchone()
+        
+        if not row:
+            conn.close()
+            return False
+            
+        actual_name = row[0]
+        analysis_json = row[1]
+        gallery_json = row[2]
+        
+        # Update Analysis JSON
+        analysis = json.loads(analysis_json) if analysis_json else {}
+        analysis['executive_summary'] = executive_summary
+        analysis['time_to_value'] = time_to_value
+        analysis['privacy_grade'] = privacy_grade
+        analysis['skill_multiplier_text'] = skill_multiplier
+        
+        # Purge Unsplash placeholder images from gallery
+        UNSPLASH_PATTERN = re.compile(r"https?://images\.unsplash\.com/", re.IGNORECASE)
+        gallery = json.loads(gallery_json) if gallery_json else []
+        clean_gallery = [g for g in gallery if not UNSPLASH_PATTERN.search(g.get('media_url', ''))]
+        
+        c.execute("""UPDATE verified_tools 
+                     SET trust_score = ?, 
+                         analysis_json = ?, 
+                         gallery_json = ?, 
+                         audit_pending = 0,
+                         last_updated = ?
+                     WHERE tool_name = ?""",
+                  (trust_score, json.dumps(analysis), json.dumps(clean_gallery), datetime.now(), actual_name))
+                  
+        # Add to audit history
+        c.execute("""INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)
+                     VALUES (?, ?, ?, ?, ?)""",
+                  (actual_name, datetime.now(), "Factory Audit - Phase 3 (Bridge)", "Automated re-audit via Worker Polling", trust_score))
+        
+        conn.commit()
+        conn.close()
+        return True

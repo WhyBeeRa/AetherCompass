@@ -40,6 +40,7 @@ const Vault = ({ setAppError }) => {
     const [editingPricing, setEditingPricing] = useState(null);
     const [newPricingValue, setNewPricingValue] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
+    const [auditPending, setAuditPending] = useState({});
 
     useEffect(() => {
         const fetchVaultStats = async () => {
@@ -149,6 +150,22 @@ const Vault = ({ setAppError }) => {
             if (setAppError) setAppError(err.message || t('vault.error_delete'));
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleRunAudit = async (toolName) => {
+        try {
+            setAuditPending(prev => ({ ...prev, [toolName]: true }));
+            const token = await currentUser.getIdToken();
+            const res = await apiFetch(`/api/admin/bridge/trigger/${encodeURIComponent(toolName.toLowerCase())}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error("Trigger failed");
+            if (setAppError) setAppError('Audit queued successfully. The local AI Factory will pick it up.');
+        } catch (err) {
+            if (setAppError) setAppError('Failed to trigger audit');
+            setAuditPending(prev => ({ ...prev, [toolName]: false }));
         }
     };
 
@@ -277,6 +294,15 @@ const Vault = ({ setAppError }) => {
                                                             title={tool.is_active ? t('vault.toggle_active_title') : t('vault.toggle_inactive_title')}
                                                         >
                                                             {tool.is_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                                        </button>
+
+                                                        <button 
+                                                            onClick={() => handleRunAudit(tool.tool_name)}
+                                                            disabled={auditPending[tool.tool_name]}
+                                                            className="p-2 text-white/30 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all"
+                                                            title="Run Local AI Audit"
+                                                        >
+                                                            <Activity className={`w-3.5 h-3.5 ${auditPending[tool.tool_name] ? 'animate-spin text-indigo-400' : ''}`} />
                                                         </button>
 
                                                         {confirmDelete === tool.tool_name ? (

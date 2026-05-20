@@ -9,6 +9,8 @@ openai
 numpy
 firebase-admin
 beautifulsoup4
-duckduckgo-search
+ddgs
 google-genai
 psutil
+pyyaml
+apscheduler

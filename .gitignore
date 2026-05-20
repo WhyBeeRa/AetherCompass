@@ -15,6 +15,9 @@ node_modules/
 dist/
 .vercel
 
+# Local AI Factory (operational data - never push to production)
+backend/local_ai_factory/
+
 # OS
 .DS_Store
 Thumbs.db

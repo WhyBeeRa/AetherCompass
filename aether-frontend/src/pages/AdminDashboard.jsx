@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Shield, 
@@ -31,6 +31,9 @@ import AdminAnalytics from './AdminAnalytics';
 import AdminVault from './AdminVault';
 import AdminAgentConsole from './AdminAgentConsole';
 import ErrorBoundary from '../components/ErrorBoundary';
+
+// Lazy load the AI Factory Panel (local-only)
+const AIFactoryPanel = React.lazy(() => import('./AIFactoryPanel'));
 
 const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
@@ -384,6 +387,7 @@ export default function AdminDashboard() {
     { id: 'agent', label: 'Agent Console', icon: Terminal, path: '/admin/agent' },
     { id: 'manual', label: 'Manual Entry', icon: PlusSquare, path: '/admin/vault' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
+    ...(isLocal ? [{ id: 'factory', label: 'AI Factory', icon: Cpu, path: '/admin/factory' }] : []),
   ];
 
   return (
@@ -482,6 +486,11 @@ export default function AdminDashboard() {
                         <Route path="/agent" element={<AdminAgentConsole />} />
                         <Route path="/analytics" element={<AdminAnalytics />} />
                         <Route path="/vault" element={<AdminVault />} />
+                        {isLocal && <Route path="/factory" element={
+                          <Suspense fallback={<div className="text-white/20 animate-pulse p-8">Loading AI Factory...</div>}>
+                            <AIFactoryPanel />
+                          </Suspense>
+                        } />}
                     </Routes>
                 </AnimatePresence>
             </ErrorBoundary>
