@@ -28,7 +28,10 @@ class DeepAuditorResult(BaseModel):
     ease_of_use: int = Field(default=4, ge=1, le=5, description="1-5 rating of user experience.")
     learning_curve: str = Field(default="Medium", description="Very Easy, Medium, Hard, or Developers Only.")
     visual_quality: str = Field(default="Mid", description="High, Mid, or Low.")
-    executive_summary: str = Field(description="A single punchy sentence: Sentence 1: Peak. Sentence 2: Trade-off.")
+    executive_summary: str = Field(description="2-3 sentences. Objective, cold, and focusing on actual utility and flaws.")
+    time_to_value: str = Field(description="Short string (e.g., 'Hours', 'Days', 'Requires heavy onboarding').")
+    privacy_grade: str = Field(description="A, B, C, D, or F based on enterprise safety.")
+    skill_multiplier: str = Field(description="Short string detailing the actual efficiency gain.")
 
 async def fetch_page(client: httpx.AsyncClient, url: str) -> str:
     try:
@@ -113,7 +116,7 @@ async def run_deep_audit_stream(url: str):
     web_results = []
     try:
         with DDGS() as ddgs:
-            query = f'"{extracted_name}" AI tool (review OR alternative OR pricing OR scam)'
+            query = f'"{extracted_name}" AI tool site:reddit.com OR site:hackernews.com review OR pricing complaints'
             results = ddgs.text(query, max_results=5)
             for r in results:
                 web_results.append(f"Source: {r.get('href')}\nSnippet: {r.get('body')}")
@@ -133,8 +136,16 @@ async def run_deep_audit_stream(url: str):
     client = genai.Client(api_key=api_key)
     
     prompt = f"""
-    You are an 'Advanced AI Tool Auditor' working for AetherCompass. Your mission is to verify tools for our AI directory based on scraped context and web intelligence.
-    
+    Role: You are Aether's Lead Auditor, a highly cynical, objective, and deeply technical AI strategist. Your goal is to protect enterprise clients from marketing fluff.
+
+    The 80/20 Rule: You MUST assign 80% of your evaluation weight to the external scout data (community sentiment, Reddit complaints, hidden costs, bugs) and only 20% to the official website's claims.
+
+    Banned Words: Never use marketing fluff. Banned words include: "empowering", "revolutionize", "magic", "seamless", "cutting-edge", "game-changer".
+
+    Trust Score Logic: The `trust_score` (1-100) must start at 50. Deduct points heavily for hidden pricing, forced enterprise demos, or strong community complaints. Add points ONLY for verifiable open-source code, transparent pricing, and overwhelming positive developer/user sentiment. 90+ scores should be exceptionally rare.
+
+    Formatting constraints: Do not use semicolons or the em-dash character in your output. Use standard hyphens instead.
+
     Target URL: {url}
     Extracted Subject Name: {extracted_name}
     Scraped Title: {meta_data['title']}
@@ -144,10 +155,9 @@ async def run_deep_audit_stream(url: str):
     Pricing Page Snippet: {pricing_text if pricing_text else "Not found"}
     
     External Web Intelligence (Reviews, Mentions, Alternatives):
-    {web_text if web_text else "No external data found. Be highly skeptical."}
+    {web_text if web_text else "No external data found. Be highly skeptical and lower trust score significantly."}
     
-    Evaluate this tool thoroughly. Look for scams, hidden costs, or false claims.
-    Return the audit results in the requested JSON structure.
+    Evaluate this tool thoroughly based on the strict directives above. Return the audit results in the exact requested JSON structure.
     """
 
     try:
