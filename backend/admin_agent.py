@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from bs4 import BeautifulSoup
 import httpx
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
