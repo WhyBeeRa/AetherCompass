@@ -1,0 +1,10 @@
+# Backend local ignore rules
+*.log
+.env
+.env.*
+*.env
+service-account.json
+apply_env.py
+gen_env.py
+vault.db
+__pycache__/

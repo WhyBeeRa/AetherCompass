@@ -1,9 +1,12 @@
-# Secrets
+# Secrets and Logs
+*.log
 .env
-.env.local
+.env.*
 *.env
 *service-account*.json
 backend/service-account.json
+apply_env.py
+gen_env.py
 
 # Python
 __pycache__/

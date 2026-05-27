@@ -15,7 +15,7 @@ services:
       - "8443:8443"
     environment:
       # 🔒 Change this password! Used to login to the web IDE.
-      - PASSWORD=yuval123!
+      - PASSWORD=${DEVBOX_PASSWORD:-changeme_immediately}
     volumes:
       # Mount the entire project into /workspace
       - .:/workspace
