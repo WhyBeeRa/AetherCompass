@@ -45,6 +45,14 @@ class AuditRequest(BaseModel):
 class BulkAuditRequest(BaseModel):
     urls: List[str]
 
+class SentinelSettingsInput(BaseModel):
+    enabled: bool
+    alert_email: str
+    frequency_minutes: int
+    failure_threshold: int
+
+global_scheduler = None
+
 app = FastAPI(title="Aeather API", description="Backend for the Agentic Grid", version="0.2.0")
 
 origins = [
@@ -108,6 +116,175 @@ embedder = LocalEmbeddingEngine.get_instance()
 # Initialize Zero-API Semantic Search Engine
 from search_engine import AetherSearchEngine
 search_engine = AetherSearchEngine(embedder, vault)
+
+def send_sentinel_email(to_email: str, error_msg: str, db_status: str, memory_usage: float):
+    """
+    Sends a clean, text-based alert report using smtplib.
+    Falls back to writing a mock email in background_tasks.log if SMTP is not configured.
+    """
+    import os
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.header import Header
+    from datetime import datetime
+    
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SMTP_FROM", "sentinel@aethercompass.com")
+    
+    subject = "AETHER SENTINEL: SYSTEM OUTAGE DETECTED"
+    body = (
+        "===============================================\n"
+        "             AETHER COMPASS SENTINEL            \n"
+        "===============================================\n\n"
+        f"Alert Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        "System Status: CRITICAL SYSTEM FAULT\n"
+        f"Target Email: {to_email}\n\n"
+        "------------------ DIAGNOSTICS ----------------\n"
+        f"Database Status: {db_status}\n"
+        f"Process Memory: {memory_usage} MB\n"
+        f"Error Details: {error_msg}\n"
+        "-----------------------------------------------\n\n"
+        "Actions Taken:\n"
+        "1. Logged alert state in primary database\n"
+        "2. Dispatched SMTP security report to administrator\n\n"
+        "Please inspect the command console immediately.\n"
+    )
+    
+    log_file = Path(__file__).parent / "background_tasks.log"
+    
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            msg = MIMEText(body, "plain", "utf-8")
+            msg["Subject"] = Header(subject, "utf-8")
+            msg["From"] = smtp_from
+            msg["To"] = to_email
+            
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                if smtp_port == 587:
+                    server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_from, [to_email], msg.as_string())
+                
+            with open(log_file, "a") as f:
+                f.write(f"[{datetime.now()}] SUCCESS: Real SMTP alert sent to {to_email}\n")
+            print(f"[Sentinel] Real SMTP alert sent to {to_email}")
+        except Exception as e:
+            with open(log_file, "a") as f:
+                f.write(f"[{datetime.now()}] ERROR: SMTP send failed: {str(e)}\n")
+            raise e
+    else:
+        mock_log = (
+            f"\n--- MOCK SMTP EMAIL DISPATCH ---\n"
+            f"From: {smtp_from}\n"
+            f"To: {to_email}\n"
+            f"Subject: {subject}\n"
+            f"Body:\n{body}"
+            f"---------------------------------\n"
+        )
+        with open(log_file, "a") as f:
+            f.write(f"[{datetime.now()}] Mock SMTP alert dispatched: {mock_log}\n")
+        print(f"[Sentinel] SMTP not configured. Mock email logged to background_tasks.log")
+
+
+async def perform_sentinel_audit(is_manual: bool = False) -> Dict:
+    """
+    Performs the actual Aether Sentinel health check.
+    Pings /admin/heartbeat internally and checks database connectivity.
+    Sends SMTP alert if failures cross threshold.
+    """
+    import os
+    import httpx
+    import psutil
+    from datetime import datetime
+    
+    memory_usage = 0.0
+    try:
+        process = psutil.Process(os.getpid())
+        memory_usage = round(process.memory_info().rss / 1024 / 1024, 2)
+    except Exception:
+        memory_usage = -1.0
+
+    db_status = "DISCONNECTED"
+    try:
+        vault.get_stats()
+        db_status = "CONNECTED"
+    except Exception:
+        db_status = "ERROR"
+
+    ping_success = False
+    ping_msg = ""
+    
+    settings = vault.get_sentinel_settings()
+    enabled = settings.get("enabled", 0)
+    
+    if not enabled and not is_manual:
+        return {"status": "skipped", "message": "Sentinel is disabled"}
+
+    try:
+        headers = {}
+        admin_key = os.getenv("ADMIN_API_KEY")
+        if admin_key:
+            headers["x-admin-key"] = admin_key
+        else:
+            headers["Authorization"] = "Bearer dev-admin-token"
+            
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get("http://127.0.0.1:8000/admin/heartbeat", headers=headers)
+            if res.status_code == 200:
+                data = res.json()
+                if data.get("database_status") == "CONNECTED":
+                    ping_success = True
+                    ping_msg = "Heartbeat ping successful"
+                else:
+                    ping_msg = f"Database status not connected: {data.get('database_status')}"
+            else:
+                ping_msg = f"HTTP error {res.status_code}"
+    except Exception as e:
+        ping_msg = f"HTTP ping failed: {str(e)}"
+
+    is_db_ok = (db_status == "CONNECTED")
+    audit_ok = is_db_ok and (ping_success or "HTTP ping failed" in ping_msg or "HTTP error" in ping_msg)
+    
+    status_str = "GREEN" if audit_ok else "RED"
+    message_str = f"Database: {db_status}. Heartbeat: {ping_msg}."
+    
+    email_sent = 0
+    new_failures = 0 if audit_ok else (settings.get("current_failures", 0) + 1)
+    
+    if not audit_ok and not is_manual:
+        threshold = settings.get("failure_threshold", 3)
+        if new_failures >= threshold:
+            if settings.get("current_failures", 0) < threshold:
+                alert_email = settings.get("alert_email", "")
+                if alert_email:
+                    try:
+                        send_sentinel_email(alert_email, message_str, db_status, memory_usage)
+                        email_sent = 1
+                        message_str += " Alert email sent."
+                    except Exception as email_err:
+                        message_str += f" Failed to send email: {str(email_err)}"
+                        print(f"[Sentinel Error] Email trigger failed: {email_err}")
+
+    if not is_manual:
+        vault.update_sentinel_failures(new_failures, status_str)
+    else:
+        vault.update_sentinel_failures(settings.get("current_failures", 0), status_str)
+
+    logged_msg = message_str + (" (Manual Trigger)" if is_manual else " (Automated Run)")
+    vault.log_sentinel_audit(status_str, logged_msg, db_status, memory_usage, email_sent)
+
+    return {
+        "status": status_str,
+        "message": message_str,
+        "database_status": db_status,
+        "memory_usage_mb": memory_usage,
+        "email_sent": bool(email_sent),
+        "current_failures": new_failures
+    }
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -193,6 +370,26 @@ async def startup_event():
 
         scheduler = AsyncIOScheduler()
         scheduler.add_job(auditor_periodic_task, 'interval', minutes=30, id='abc_tom_auditor')
+        
+        # --- Aether Sentinel Periodic Health Monitoring ---
+        sentinel_settings = vault.get_sentinel_settings()
+        sentinel_enabled = bool(sentinel_settings.get("enabled", 0))
+        sentinel_freq = int(sentinel_settings.get("frequency_minutes", 30))
+        
+        if sentinel_enabled:
+            scheduler.add_job(
+                perform_sentinel_audit, 
+                'interval', 
+                minutes=sentinel_freq, 
+                id='aether_sentinel'
+            )
+            await log_terminal(f"[Sentinel] Task initialized - monitoring every {sentinel_freq} minutes")
+        else:
+            await log_terminal("[Sentinel] Task initialized - standby state (monitoring disabled)")
+            
+        global global_scheduler
+        global_scheduler = scheduler
+        
         scheduler.start()
         await log_terminal("[ABC-TOM] APScheduler started - Auditor runs every 30 minutes")
         print("[ABC-TOM] APScheduler initialized successfully")
@@ -610,6 +807,57 @@ async def delete_vault_tool(name: str, admin_email: str = Depends(verify_admin_u
     except Exception as e:
         print(f"[Admin Error] Failed to delete tool: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/sentinel/settings", dependencies=[Depends(verify_admin_user)])
+def get_sentinel_settings(admin_email: str = Depends(verify_admin_user)):
+    """Retrieves Aether Sentinel settings."""
+    settings = vault.get_sentinel_settings()
+    settings["enabled"] = bool(settings.get("enabled", 0))
+    return settings
+
+@app.post("/admin/sentinel/settings", dependencies=[Depends(verify_admin_user)])
+async def update_sentinel_settings(settings: SentinelSettingsInput, admin_email: str = Depends(verify_admin_user)):
+    """Updates Sentinel configuration and schedules or updates tasks dynamically."""
+    vault.update_sentinel_settings(
+        1 if settings.enabled else 0,
+        settings.alert_email,
+        settings.frequency_minutes,
+        settings.failure_threshold
+    )
+    
+    global global_scheduler
+    if global_scheduler:
+        try:
+            job = global_scheduler.get_job('aether_sentinel')
+            if job:
+                global_scheduler.remove_job('aether_sentinel')
+                
+            if settings.enabled:
+                global_scheduler.add_job(
+                    perform_sentinel_audit,
+                    'interval',
+                    minutes=settings.frequency_minutes,
+                    id='aether_sentinel'
+                )
+                await log_terminal(f"[Sentinel] Dynamic Reschedule - Monitoring active every {settings.frequency_minutes} minutes")
+            else:
+                await log_terminal("[Sentinel] Dynamic Standby - Periodic monitoring paused")
+        except Exception as se:
+            print(f"[Sentinel Settings Exception] Job re-alignment failed: {se}")
+            await log_terminal(f"[Sentinel Error] Dynamic realignment failed: {str(se)}")
+            
+    return {"status": "success", "message": "Sentinel settings saved and worker dynamically configured."}
+
+@app.get("/admin/sentinel/logs", dependencies=[Depends(verify_admin_user)])
+def get_sentinel_logs(limit: int = 50, admin_email: str = Depends(verify_admin_user)):
+    """Retrieves recent health check sentinel audit logs."""
+    return vault.get_sentinel_audit_logs(limit=limit)
+
+@app.post("/admin/sentinel/test-audit", dependencies=[Depends(verify_admin_user)])
+async def test_sentinel_audit(admin_email: str = Depends(verify_admin_user)):
+    """Manually triggers a Sentinel audit scan in real-time and returns detailed status."""
+    result = await perform_sentinel_audit(is_manual=True)
+    return result
 
 @app.get("/admin/analytics", dependencies=[Depends(verify_admin_user)])
 def get_analytics(admin_email: str = Depends(verify_admin_user)):

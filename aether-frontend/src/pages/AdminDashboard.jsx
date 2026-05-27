@@ -30,6 +30,7 @@ import ReviewQueue from './ReviewQueue';
 import AdminAnalytics from './AdminAnalytics';
 import AdminVault from './AdminVault';
 import AdminAgentConsole from './AdminAgentConsole';
+import AdminSentinel from './AdminSentinel';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 // Lazy load the AI Factory Panel (local-only)
@@ -383,6 +384,7 @@ export default function AdminDashboard() {
 
   const menuItems = [
     { id: 'pulse', label: 'System Pulse', icon: Activity, path: '/admin' },
+    { id: 'sentinel', label: 'Sentinel', icon: Shield, path: '/admin/sentinel' },
     { id: 'review', label: 'Review Queue', icon: Layers, path: '/admin/requests' },
     { id: 'agent', label: 'Agent Console', icon: Terminal, path: '/admin/agent' },
     { id: 'manual', label: 'Manual Entry', icon: PlusSquare, path: '/admin/vault' },
@@ -482,6 +484,7 @@ export default function AdminDashboard() {
                 <AnimatePresence mode="wait">
                     <Routes>
                         <Route path="/" element={<SystemPulse />} />
+                        <Route path="/sentinel" element={<AdminSentinel />} />
                         <Route path="/requests" element={<ReviewQueue />} />
                         <Route path="/agent" element={<AdminAgentConsole />} />
                         <Route path="/analytics" element={<AdminAnalytics />} />

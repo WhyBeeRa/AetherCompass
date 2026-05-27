@@ -144,6 +144,32 @@ class AetherVault:
                         comparison_vs_avg REAL
                     )''')
 
+        # 8. Sentinel Settings
+        c.execute('''CREATE TABLE IF NOT EXISTS sentinel_settings (
+                        id INTEGER PRIMARY KEY DEFAULT 1,
+                        enabled INTEGER DEFAULT 0,
+                        alert_email TEXT DEFAULT '',
+                        frequency_minutes INTEGER DEFAULT 30,
+                        failure_threshold INTEGER DEFAULT 3,
+                        current_failures INTEGER DEFAULT 0,
+                        last_run_timestamp TIMESTAMP,
+                        last_status TEXT DEFAULT 'PENDING'
+                    )''')
+        
+        # Seed default settings row if missing
+        c.execute("INSERT OR IGNORE INTO sentinel_settings (id, enabled, alert_email, frequency_minutes, failure_threshold, current_failures) VALUES (1, 0, '', 30, 3, 0)")
+
+        # 9. Sentinel Audit Logs
+        c.execute('''CREATE TABLE IF NOT EXISTS sentinel_audit_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TIMESTAMP,
+                        status TEXT,
+                        message TEXT,
+                        database_status TEXT,
+                        memory_usage_mb REAL,
+                        email_sent INTEGER DEFAULT 0
+                    )''')
+
         # Migration: Add reason column to elo_battles if it doesn't exist
         try:
              c.execute("ALTER TABLE elo_battles ADD COLUMN reason TEXT")
@@ -760,3 +786,75 @@ class AetherVault:
         conn.commit()
         conn.close()
         return True
+
+    def get_sentinel_settings(self) -> Dict[str, Any]:
+        """Retrieves the Aether Sentinel settings."""
+        conn = self._get_conn()
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM sentinel_settings WHERE id = 1")
+        row = c.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+        return {
+            "id": 1,
+            "enabled": 0,
+            "alert_email": "",
+            "frequency_minutes": 30,
+            "failure_threshold": 3,
+            "current_failures": 0,
+            "last_run_timestamp": None,
+            "last_status": "PENDING"
+        }
+
+    def update_sentinel_settings(self, enabled: int, alert_email: str, frequency_minutes: int, failure_threshold: int) -> bool:
+        """Updates Aether Sentinel settings and resets dynamic counters if needed."""
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute("""UPDATE sentinel_settings 
+                     SET enabled = ?, 
+                         alert_email = ?, 
+                         frequency_minutes = ?, 
+                         failure_threshold = ?,
+                         current_failures = 0
+                     WHERE id = 1""", 
+                  (enabled, alert_email, frequency_minutes, failure_threshold))
+        conn.commit()
+        conn.close()
+        return True
+
+    def update_sentinel_failures(self, current_failures: int, last_status: str) -> bool:
+        """Updates the failures count and last run timestamp."""
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute("""UPDATE sentinel_settings 
+                     SET current_failures = ?, 
+                         last_status = ?, 
+                         last_run_timestamp = ? 
+                     WHERE id = 1""", 
+                  (current_failures, last_status, datetime.now()))
+        conn.commit()
+        conn.close()
+        return True
+
+    def log_sentinel_audit(self, status: str, message: str, database_status: str, memory_usage_mb: float, email_sent: int):
+        """Creates an audit log entry for the Sentinel run."""
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute("""INSERT INTO sentinel_audit_logs 
+                     (timestamp, status, message, database_status, memory_usage_mb, email_sent) 
+                     VALUES (?, ?, ?, ?, ?, ?)""", 
+                  (datetime.now(), status, message, database_status, memory_usage_mb, email_sent))
+        conn.commit()
+        conn.close()
+
+    def get_sentinel_audit_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieves historical health checks of Aether Sentinel."""
+        conn = self._get_conn()
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM sentinel_audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,))
+        rows = c.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState, useEffect } from "react";
 import { Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
-import { AlertCircle, Server, Shield, ShieldCheck, Settings as SettingsIcon, LogOut, User, BarChart3, PlusSquare, Scale, Zap, Activity, GitBranch, Coins } from "lucide-react";
-import SpaceBackground from "./components/SpaceBackground";
+import { AlertCircle, Server, Shield, ShieldCheck, Settings as SettingsIcon, LogOut, User, BarChart3, PlusSquare, Scale, Zap, Activity, GitBranch, Coins, X, Menu } from "lucide-react";
+import SparklesBackground from "./components/SparklesBackground";
 import { useAuth } from "./AuthContext";
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
@@ -17,7 +17,7 @@ const MyStack = lazy(() => import("./pages/MyStack"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Support = lazy(() => import("./pages/Support"));
 const UseCases = lazy(() => import("./pages/UseCases"));
-const About = lazy(() => import("./pages/About"));
+const Discover = lazy(() => import("./pages/Discover"));
 const Blog = lazy(() => import("./pages/Blog"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -35,6 +35,13 @@ function App() {
   const [appError, setAppError] = useState(null);
   const { currentUser, isAdmin, logout } = useAuth();
   const { t, i18n } = useTranslation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -75,15 +82,31 @@ function App() {
     document.body.appendChild(script);
   }, []);
 
-  const location = useLocation();
-  const isAboutPage = location.pathname === '/about';
+  const isDiscoverPage = location.pathname === '/discover';
 
+  // Auto-dismiss error after 6 seconds
+  useEffect(() => {
+    if (appError) {
+      const timer = setTimeout(() => {
+        setAppError(null);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [appError]);
+
+  const [prevPath, setPrevPath] = useState(location.pathname);
+  if (location.pathname !== prevPath) {
+    setPrevPath(location.pathname);
+    if (appError) {
+      setAppError(null);
+    }
+  }
 
   const dir = i18n.dir();
 
   return (
-    <div className="min-h-screen font-sans antialiased flex flex-col w-full relative text-slate-200" dir="ltr">
-      <SpaceBackground />
+    <div className="min-h-screen font-sans antialiased flex flex-col w-full relative text-slate-200" dir={dir}>
+      <SparklesBackground />
 
       {/* 1. Enterprise Header - PERSISTENT OUTSIDE ROUTES */}
       <header className="sticky top-0 z-50 w-full bg-[#02050a]/70 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
@@ -103,7 +126,7 @@ function App() {
         </div>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/50">
-          <Link to="/about#how-it-works" className="hover:text-cyan-300 transition-colors">{t('nav.how_it_works')}</Link>
+          <Link to="/discover#how-it-works" className="hover:text-cyan-300 transition-colors">{t('footer.about') || 'About Us'}</Link>
           <Link to="/use-cases" className="hover:text-cyan-300 transition-colors">{t('nav.use_cases')}</Link>
           <Link to="/vault" className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors">
             <Server className="w-3.5 h-3.5" />
@@ -128,7 +151,7 @@ function App() {
         <div className="flex items-center gap-4">
           {currentUser ? (
             <div className="flex items-center gap-4" dir="ltr">
-              <div className="flex flex-col items-start leading-tight">
+              <div className="flex flex-col items-start leading-tight hidden sm:flex">
                 <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{t('nav.hello')}</span>
                 <span className="text-sm font-bold text-white tracking-tight">
                   {currentUser.displayName || currentUser.email.split('@')[0]}
@@ -162,11 +185,55 @@ function App() {
               </Link>
             </>
           )}
+
+          {/* Mobile Menu Toggle Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all active:scale-95 shrink-0"
+            aria-label="Toggle navigation menu"
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </header>
 
+      {/* Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-[#02050a]/95 backdrop-blur-2xl md:hidden flex flex-col pt-24 px-6 animate-in fade-in duration-300">
+          <nav className="flex flex-col gap-6 text-xl font-semibold text-white/80">
+            <Link to="/discover#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-cyan-300 transition-colors py-2 border-b border-white/5">{t('footer.about') || 'About Us'}</Link>
+            <Link to="/use-cases" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-cyan-300 transition-colors py-2 border-b border-white/5">{t('nav.use_cases')}</Link>
+            <Link to="/vault" className="flex items-center gap-3 hover:text-cyan-300 transition-colors py-2 border-b border-white/5">
+              <Server className="w-5 h-5" />
+              {t('nav.vault')}
+            </Link>
+            <Link to="/insiders" className="flex items-center gap-3 hover:text-cyan-300 transition-colors py-2 border-b border-white/5">
+              <User className="w-5 h-5" />
+              {t('nav.community')}
+            </Link>
+            <Link to="/compare" className="flex items-center gap-3 hover:text-indigo-400 transition-colors text-indigo-300/80 py-2 border-b border-white/5">
+              <Scale className="w-5 h-5" />
+              {t('nav.compare')}
+            </Link>
+
+            {isAdmin && (
+              <Link to="/admin" className="flex items-center gap-3 text-cyan-400 hover:text-cyan-300 transition-all font-bold py-2 border-b border-white/5">
+                <Shield className="w-5 h-5" />
+                {t('nav.admin')}
+              </Link>
+            )}
+
+            {!currentUser && (
+              <Link to="/activation" className="text-center mt-4 px-6 py-4 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-xl hover:bg-cyan-500/20 transition-all">
+                {t('nav.login')} / {t('nav.get_started')}
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
+
       {/* Main Container - The dynamic part */}
-      <main className={`w-full flex flex-col items-center flex-1 ${isAboutPage ? '' : 'max-w-4xl mx-auto px-4 pt-8 pb-24'}`}>
+      <main className={`w-full flex flex-col items-center flex-1 ${isDiscoverPage ? '' : 'max-w-4xl mx-auto px-4 pt-8 pb-24'}`}>
         <Suspense fallback={<div className="min-h-[50vh] w-full bg-[#040914]" />}>
           <Routes>
             <Route path="/" element={<Home setAppError={setAppError} />} />
@@ -178,7 +245,7 @@ function App() {
             <Route path="/settings" element={<Settings setAppError={setAppError} />} />
             <Route path="/support" element={<Support setAppError={setAppError} />} />
             <Route path="/use-cases" element={<UseCases setAppError={setAppError} />} />
-            <Route path="/about" element={<About setAppError={setAppError} />} />
+            <Route path="/discover" element={<Discover setAppError={setAppError} />} />
             <Route path="/blog" element={<Blog setAppError={setAppError} />} />
             <Route path="/blog/:slug" element={<BlogPost setAppError={setAppError} />} />
             <Route path="/api-docs" element={<ApiDocs setAppError={setAppError} />} />
@@ -213,7 +280,7 @@ function App() {
           <div>
             <h4 className="font-semibold text-white mb-4 text-sm">{t('footer.company')}</h4>
             <ul className="space-y-2 text-sm text-white/60">
-              <li><Link to="/about" className="hover:text-cyan-400 transition-colors">{t('footer.about')}</Link></li>
+              <li><Link to="/discover" className="hover:text-cyan-400 transition-colors">{t('footer.about')}</Link></li>
               <li><Link to="/blog" className="hover:text-cyan-400 transition-colors">{t('footer.blog')}</Link></li>
               <li><Link to="/contact" className="hover:text-cyan-400 transition-colors">{t('footer.contact')}</Link></li>
             </ul>
@@ -245,11 +312,20 @@ function App() {
         </div>
       </footer>
 
-      {/* Subtle Error Toast Fixed at bottom (Clinical Light Mode Fallback) */}
+      {/* Subtle Error Toast Fixed at corner (Clinical Light Mode Fallback) */}
       {appError && (
-        <div className="fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl bg-red-500/90 backdrop-blur-md border border-red-500/50 text-white text-sm flex items-center justify-center gap-2 font-medium shadow-2xl transition-all animate-in slide-in-from-top-5">
-          <AlertCircle className="w-5 h-5 text-white" />
-          {appError}
+        <div className="fixed top-4 right-4 z-[9999] max-w-sm px-4 py-3 rounded-xl bg-red-500/90 backdrop-blur-md border border-red-500/50 text-white text-sm flex items-center justify-between gap-4 font-medium shadow-2xl transition-all animate-in slide-in-from-top-5">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-white shrink-0" />
+            <span>{appError}</span>
+          </div>
+          <button 
+            onClick={() => setAppError(null)} 
+            className="p-1 hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-white/80 hover:text-white shrink-0"
+            aria-label="Dismiss notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
