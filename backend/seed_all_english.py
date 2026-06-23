@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import sqlite3
 from pathlib import Path
 from datetime import datetime
 
@@ -15,12 +14,12 @@ from persistence import AetherVault
 
 def clear_database():
     print("Purging existing data to ensure 100% English environment...")
-    db_path = Path(__file__).resolve().parent / "vault.db"
-    conn = sqlite3.connect(db_path)
+    vault = AetherVault()
+    conn = vault._get_conn()
     c = conn.cursor()
-    c.execute("DELETE FROM verified_tools")
-    c.execute("DELETE FROM search_index")
-    c.execute("DELETE FROM audit_history")
+    c.execute("TRUNCATE TABLE verified_tools CASCADE")
+    c.execute("TRUNCATE TABLE search_index CASCADE")
+    c.execute("TRUNCATE TABLE audit_history CASCADE")
     conn.commit()
     conn.close()
 

@@ -1,11 +1,8 @@
 """
 RemoteEmbeddingEngine — Gemini-powered Embedding Service
 =========================================================
-Replaces local ONNX models with Google's text-embedding-004.
-Eliminates heavy dependencies (onnxruntime, tokenizers) to fit Render 512MB limit.
-
-Model: text-embedding-004
-Dimensions: 768 (Default)
+Uses Google's gemini-embedding-2 model.
+Configured for 768-dimensional outputs.
 """
 import os
 import numpy as np
@@ -27,8 +24,8 @@ class LocalEmbeddingEngine:
             print("[Embedder] WARNING: GEMINI_API_KEY not found in environment.")
         
         self.client = genai.Client(api_key=self.api_key)
-        self.model_id = "text-embedding-004"
-        print(f"[Embedder] Initialized Remote Engine using {self.model_id}")
+        self.model_id = "gemini-embedding-2"
+        print(f"[Embedder] Initialized Remote Engine using {self.model_id} (768-dim)")
 
     @classmethod
     def get_instance(cls) -> "LocalEmbeddingEngine":
@@ -55,15 +52,17 @@ class LocalEmbeddingEngine:
             result = self.client.models.embed_content(
                 model=self.model_id,
                 contents=text,
-                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
+                config=types.EmbedContentConfig(
+                    task_type="RETRIEVAL_QUERY",
+                    output_dimensionality=768
+                )
             )
             
             vector = result.embeddings[0].values
             return np.array(vector, dtype=np.float32)
         except Exception as e:
             print(f"[Embedder] API Error: {e}")
-            # Return zero vector on failure to prevent crash, 
-            # though search quality will drop for this specific item.
+            # Return zero vector on failure to prevent crash
             return np.zeros(768, dtype=np.float32)
 
     def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
@@ -74,17 +73,19 @@ class LocalEmbeddingEngine:
             return []
 
         try:
-            # text-embedding-004 supports batching
             result = self.client.models.embed_content(
                 model=self.model_id,
                 contents=texts,
-                config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT")
+                config=types.EmbedContentConfig(
+                    task_type="RETRIEVAL_DOCUMENT",
+                    output_dimensionality=768
+                )
             )
             
             return [np.array(emb.values, dtype=np.float32) for emb in result.embeddings]
         except Exception as e:
             print(f"[Embedder] Batch API Error: {e}")
-            # Fallback to individual calls if batch fails or just return zeros
+            # Fallback to individual calls if batch fails
             return [self.embed(t) for t in texts]
 
     def embed_to_bytes(self, text: str) -> bytes:

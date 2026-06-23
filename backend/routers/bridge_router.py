@@ -1,7 +1,7 @@
 import os
 import json
 import re
-from fastapi import APIRouter, Depends, HTTPException, Header, Body
+from fastapi import APIRouter, Depends, HTTPException, Header, Body, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
@@ -15,12 +15,21 @@ router = APIRouter(
 vault = AetherVault()
 UNSPLASH_PATTERN = re.compile(r"https?://images\.unsplash\.com/", re.IGNORECASE)
 
-def verify_bridge_key(authorization: str = Header(None), x_admin_key: str = Header(None)):
+def verify_bridge_key(request: Request, authorization: str = Header(None), x_admin_key: str = Header(None)):
     """Simple strong API key validation for the server-to-server bridge."""
     expected_key = os.getenv("ADMIN_API_KEY")
     if not expected_key:
-        # Fallback to dev mode if env is not fully configured, though in prod it should be set
-        expected_key = "dev_secret_bridge_key_123!"
+        # Fallback to dev mode only if in development environment
+        is_development = os.getenv("ENVIRONMENT") == "development" or os.getenv("APP_ENV") == "development"
+        if not is_development and os.getenv("ENVIRONMENT") != "production" and os.getenv("APP_ENV") != "production":
+            if request is not None:
+                is_development = request.url.hostname in ("localhost", "127.0.0.1", "testserver")
+            
+        if is_development:
+            expected_key = "dev_secret_bridge_key_123!"
+        else:
+            print("[BRIDGE SECURITY ERROR] ADMIN_API_KEY not configured in production!")
+            raise HTTPException(status_code=500, detail="Bridge is misconfigured in production")
         
     print(f"[BRIDGE_DEBUG] Received auth header: {authorization}, x_admin_key: {x_admin_key}")
     print(f"[BRIDGE_DEBUG] Expected key: {expected_key}")

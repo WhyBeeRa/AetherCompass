@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether Sentinel Audit Report</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0B0F19;
+            color: #E2E8F0;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #0B0F19;
+            padding: 30px 0;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background-color: #111827;
+            border: 1px solid #1F2937;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            padding: 40px 30px;
+            border-bottom: 2px solid #F59E0B;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: #FFFFFF;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+            color: #94A3B8;
+        }
+        .status-badge {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 6px 16px;
+            background-color: rgba(245, 158, 11, 0.15);
+            border: 1px solid #F59E0B;
+            border-radius: 9999px;
+            font-weight: 700;
+            font-size: 14px;
+            color: #F59E0B;
+        }
+        .content {
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #38BDF8;
+            border-bottom: 1px solid #1F2937;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .card {
+            background-color: #1F2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .stat-card {
+            background-color: #1F2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin-top: 5px;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .flex-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .flex-row:last-child {
+            margin-bottom: 0;
+        }
+        .item-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #94A3B8;
+        }
+        .item-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: #F8FAFC;
+        }
+        .badge-ok {
+            color: #10B981;
+            background-color: rgba(16, 185, 129, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .badge-err {
+            color: #EF4444;
+            background-color: rgba(239, 68, 68, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .badge-warn {
+            color: #F59E0B;
+            background-color: rgba(245, 158, 11, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .footer {
+            background-color: #0B0F19;
+            padding: 20px 30px;
+            text-align: center;
+            border-top: 1px solid #1F2937;
+            font-size: 12px;
+            color: #64748B;
+        }
+        .recovery-tip {
+            background-color: rgba(239, 68, 68, 0.05);
+            border: 1px dashed rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #FDA4AF;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                <h1>🛡️ Aether Sentinel</h1>
+                <p>Daily Automated System Audit Report</p>
+                <div class="status-badge">🟡 SYSTEM STATUS: AMBER</div>
+            </div>
+            
+            <div class="content">
+                <!-- 1. Services Status -->
+                <div class="section">
+                    <div class="section-title">🌐 Services Status</div>
+                    <div class="card">
+                        <div class="flex-row">
+                            <span class="item-label">FastAPI Backend (Port 8000)</span>
+                            <span class="badge-ok">
+                                ONLINE
+                            </span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">Vite Frontend (Port 5173)</span>
+                            <span class="badge-err">
+                                OFFLINE
+                            </span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">Aether Vault Database File</span>
+                            <span class="badge-ok">
+                                CONNECTED
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. AI & Integration Integrity -->
+                <div class="section">
+                    <div class="section-title">🧠 AI & Integration Integrity</div>
+                    <div class="card">
+                        <div class="flex-row">
+                            <span class="item-label">Gemini API Key</span>
+                            <span class="badge-ok" style="font-family: monospace;">
+                                AQ.Ab8RN...beBw
+                            </span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">Gemini API Health Check</span>
+                            <span class="badge-ok">
+                                GREEN
+                            </span>
+                        </div>
+                        <div class="flex-row" style="margin-top: 4px;">
+                            <span style="font-size: 12px; color: #94A3B8; max-width: 80%;">Successfully connected to Gemini 2.5 Flash.</span>
+                            <span style='font-size: 12px; color: #38BDF8;'>1579.35 ms</span>
+                        </div>
+                        <hr style="border: 0; border-top: 1px solid #374151; margin: 10px 0;">
+                        <div class="flex-row">
+                            <span class="item-label">Firebase Auth Platform Check</span>
+                            <span class="badge-ok">
+                                GREEN
+                            </span>
+                        </div>
+                        <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">
+                            Firebase credentials verified offline for Project: aethercompass-prod-42214.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Database Catalog & Analytics -->
+                <div class="section">
+                    <div class="section-title">📊 Database & Catalog Summary</div>
+                    <div class="grid">
+                        <div class="stat-card">
+                            <div class="stat-value">7</div>
+                            <div class="stat-label">Verified Tools</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">Pending Review</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">0</div>
+                            <div class="stat-label">Searches (24h)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">0/0</div>
+                            <div class="stat-label">Search Hits/Misses</div>
+                        </div>
+                    </div>
+                    <div class="card" style="margin-top: 12px;">
+                        <div class="flex-row">
+                            <span class="item-label">Total ELO Battles Recorded</span>
+                            <span class="item-value">0</span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">Live Performance Benchmarks</span>
+                            <span class="item-value">4</span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">Database Stats Check</span>
+                            <span class="badge-ok">
+                                GREEN
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. System Resources -->
+                <div class="section">
+                    <div class="section-title">⚙️ System Resources</div>
+                    <div class="card">
+                        <div class="flex-row">
+                            <span class="item-label">CPU Utilization</span>
+                            <span class="item-value">5.5%</span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">RAM Usage</span>
+                            <span class="item-value">14.71 / 15.87 GB (92.7%)</span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">Repository Disk Space</span>
+                            <span class="item-value">290.3 / 446.12 GB (65.1% used)</span>
+                        </div>
+                        <div class="flex-row">
+                            <span class="item-label">FastAPI Process RAM</span>
+                            <span class="item-value">0.0 MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recovery Actions if Amber or Red -->
+                <div class="recovery-tip">
+                    <strong>⚠️ Suggested Recovery Protocols:</strong><br>
+                    
+                    • Start the Vite dev server: <code>npm run dev</code><br>
+                    
+                    
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>This automated audit was compiled by Aether Sentinel.<br>Timestamp: 2026-06-23 16:38:43</p>
+                <p>&copy; 2026 AetherCompass. All Rights Secured.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

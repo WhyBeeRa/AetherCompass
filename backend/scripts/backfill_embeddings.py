@@ -1,34 +1,28 @@
 """
-Backfill Embeddings Script (FastEmbed Local)
-=============================================
-Re-embeds all tools in the vault using the local FastEmbed model.
-NO API calls. NO rate limits. Runs in ~5 seconds for 31 tools.
-
-Usage:
-    cd backend
-    python scripts/backfill_embeddings.py
+Backfill Embeddings Script (PostgreSQL + pgvector)
+=================================================
+Re-embeds all tools in the vault using Google's text-embedding-004.
 """
 import sys
 import os
 
-# Ensure backend/ is on the path so we can import persistence, local_embedder, etc.
+# Ensure backend/ is on the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import sqlite3
 import json
 import numpy as np
-from pathlib import Path
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
 
+# Load env variables from backend/.env
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+from persistence import AetherVault
 from local_embedder import LocalEmbeddingEngine
-
-DB_PATH = Path(__file__).resolve().parent.parent / "vault.db"
 
 
 def build_search_text(tool_name: str, analysis: dict) -> str:
-    """
-    Build a rich text corpus for embedding from the tool's stored analysis.
-    Combines name, summary, jobs, intents, pros, and use cases.
-    """
     parts = [f"Tool Name: {tool_name}"]
 
     summary = analysis.get("executive_summary", "")
@@ -58,30 +52,22 @@ def build_search_text(tool_name: str, analysis: dict) -> str:
 
 def run_backfill():
     print("=" * 60)
-    print("  AetherCompass FastEmbed Backfill")
-    print("  Model: BAAI/bge-small-en-v1.5 (384 dims)")
+    print("  AetherCompass PostgreSQL pgvector Backfill")
+    print("  Model: text-embedding-004 (768 dims)")
     print("=" * 60)
 
-    # 1. Load the model (singleton)
-    print("\n[1/3] Loading FastEmbed model...")
+    # 1. Load the model
+    print("\n[1/3] Loading embedding engine...")
     engine = LocalEmbeddingEngine.get_instance()
-    print("  [OK] Model loaded.\n")
+    vault = AetherVault()
+    print("  [OK] Engine ready.\n")
 
-    # 2. Read all tools from DB
-    print(f"[2/3] Reading tools from {DB_PATH}...")
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
+    # 2. Read all tools
+    print("[2/3] Reading tools from PostgreSQL...")
+    conn = vault._get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Ensure embedding_blob column exists
-    try:
-        c.execute("ALTER TABLE verified_tools ADD COLUMN embedding_blob BLOB")
-        conn.commit()
-        print("  [OK] Created embedding_blob column.")
-    except sqlite3.OperationalError:
-        pass  # Already exists
-
-    c.execute("SELECT tool_name, analysis_json, embedding_blob FROM verified_tools")
+    c.execute("SELECT tool_name, analysis_json, embedding FROM verified_tools")
     rows = c.fetchall()
     print(f"  [OK] Found {len(rows)} tools.\n")
 
@@ -94,11 +80,11 @@ def run_backfill():
     for row in rows:
         tool_name = row["tool_name"]
 
-        # Skip if already has a valid embedding_blob
-        if row["embedding_blob"]:
-            existing = np.frombuffer(row["embedding_blob"], dtype=np.float32)
-            if len(existing) == 384:
-                print(f"  [SKIP] '{tool_name}' — already has 384-dim embedding, skipping.")
+        # Skip if already has a valid 768-dim embedding (and is not all zeros)
+        if row["embedding"] is not None:
+            existing = np.array(row["embedding"])
+            if len(existing) == 768 and not np.all(existing == 0):
+                print(f"  [SKIP] '{tool_name}' — already has 768-dim embedding.")
                 skipped += 1
                 continue
 
@@ -106,17 +92,21 @@ def run_backfill():
             analysis = json.loads(row["analysis_json"]) if row["analysis_json"] else {}
             search_text = build_search_text(tool_name, analysis)
 
-            # Embed locally
+            # Embed
             vector = engine.embed(search_text)
             blob = vector.tobytes()
+            vector_list = vector.tolist()
 
             # Save to DB
-            c.execute("UPDATE verified_tools SET embedding_blob = ? WHERE tool_name = ?",
-                       (blob, tool_name))
+            c_update = conn.cursor()
+            c_update.execute(
+                "UPDATE verified_tools SET embedding_blob = %s, embedding = %s WHERE tool_name = %s",
+                (psycopg2.Binary(blob), vector_list, tool_name)
+            )
             conn.commit()
 
             processed += 1
-            print(f"  [OK] '{tool_name}' — embedded ({len(vector)} dims, {len(blob)} bytes)")
+            print(f"  [OK] '{tool_name}' — embedded (768 dims)")
 
         except Exception as e:
             failed += 1

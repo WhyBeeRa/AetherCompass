@@ -4,11 +4,16 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://aether_user:aether_password@db:5432/aether_db
     volumes:
-      # Persist SQLite database - persistence.py expects vault.db at /app/vault.db
-      - ./backend/vault.db:/app/vault.db
+      # Persist SQLite database (legacy, commented out)
+      # - ./backend/vault.db:/app/vault.db
+      - ./backend:/app
     restart: always
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
@@ -27,6 +32,19 @@ services:
       - backend
     restart: always
 
+  db:
+    image: ankane/pgvector:latest
+    container_name: aether-db
+    environment:
+      POSTGRES_DB: aether_db
+      POSTGRES_USER: aether_user
+      POSTGRES_PASSWORD: aether_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel --no-autoupdate run --token eyJhIjoiMTNkNjZhZTMwOTU1Mzk5ZTU5M2RjZmQyYjExZTgwMWEiLCJ0IjoiN2Q5Njk5MmMtOWU5NS00ZjdlLThlZmYtM2QzOWUwOWMwZjE2IiwicyI6IllqRTVZemM0TWpjdFkyVmlNUzAwWmpFNUxUa3hOV1F0WkRRME1qTTRaR0V4T0RJeSJ9
@@ -34,3 +52,6 @@ services:
       - frontend
       - backend
     restart: always
+
+volumes:
+  pgdata:

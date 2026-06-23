@@ -31,18 +31,22 @@ class AetherPipeline:
         from persistence import AetherVault
         vault = AetherVault()
         
-        # Check if the vault already has tools answering this exact intent
-        cached_results = vault.search_tools(intent)
-        if cached_results:
-             print(f"[Pipeline] [VAULT] Identity Found for intent '{intent}'. Retrieving from secured memory (Zero Latency).")
-             # Return the first match for the pipeline result formatting
-             # Frontend already hits /vault/search so this is mostly for completeness if polled
+        # Check if the vault already has tools answering this intent (Semantic Cache)
+        from semantic_cache import AetherSemanticCache
+        from local_embedder import LocalEmbeddingEngine
+        
+        embedder = LocalEmbeddingEngine.get_instance()
+        semantic_cache = AetherSemanticCache(embedder, vault)
+        
+        cached_tool = semantic_cache.check_cache(intent)
+        if cached_tool:
+             print(f"[Pipeline] [VAULT] Semantic cache hit for intent '{intent}'. Retrieving from secured memory (Zero Latency).")
              return {
                  "status": "success", 
-                 "tool_name": cached_results[0]["tool_name"],
-                 "analysis": cached_results[0]["analysis"],
-                 "trust_score": cached_results[0]["trust_score"],
-                 "gallery": cached_results[0]["gallery"],
+                 "tool_name": cached_tool["tool_name"],
+                 "analysis": cached_tool["analysis"],
+                 "trust_score": cached_tool["trust_score"],
+                 "gallery": cached_tool["gallery"],
                  "cached": True
              }
 
@@ -112,6 +116,9 @@ class AetherPipeline:
             gallery=gallery_items,
             audit_log=audit_log
         )
+        
+        # Save to semantic cache
+        semantic_cache.save_cache(intent, target_finding.tool_name)
 
         # ---------------------------------------------------------
         # FINAL PAYLOAD

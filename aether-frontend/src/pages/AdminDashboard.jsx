@@ -120,55 +120,65 @@ const SystemPulse = () => {
   };
 
   // BUG-13 fix: Strip trailing slashes from API_BASE to prevent double-slash in WS URL
-  const connectWS = () => {
+  const connectWS = async () => {
     if (wsRef.current) wsRef.current.close();
     if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
     if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
 
-    const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
-    const wsHost = API_BASE.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/logs`;
-    
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-        setConnectionActive(true);
-        console.log("WebSocket connected to:", wsUrl);
+    try {
+        const token = isLocal ? "dev-admin-token" : (currentUser ? await currentUser.getIdToken() : "");
+        const wsProtocol = API_BASE.startsWith('https') ? 'wss:' : 'ws:';
+        const wsHost = API_BASE.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+        const wsUrl = `${wsProtocol}//${wsHost}/ws/logs?token=${encodeURIComponent(token)}`;
         
-        heartbeatInterval.current = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'ping' }));
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+            setConnectionActive(true);
+            console.log("WebSocket connected to:", wsUrl);
+            
+            heartbeatInterval.current = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000);
+        };
+
+        ws.onmessage = (event) => {
+            const message = event.data;
+            try {
+                const data = JSON.parse(message);
+                if (data.type === 'pong') return;
+            } catch (e) {
+                // Not JSON, treat as raw log line
             }
-        }, 30000);
-    };
+            
+            setLogs(prev => {
+                const updated = [...prev, message];
+                return updated.slice(-200); 
+            });
+        };
 
-    ws.onmessage = (event) => {
-        const message = event.data;
-        try {
-            const data = JSON.parse(message);
-            if (data.type === 'pong') return;
-        } catch (e) {
-            // Not JSON, treat as raw log line
-        }
-        
-        setLogs(prev => {
-            const updated = [...prev, message];
-            return updated.slice(-200); 
-        });
-    };
+        ws.onclose = (event) => {
+            setConnectionActive(false);
+            if (event.code === 1008) {
+                console.error("WebSocket connection rejected: unauthorized access.");
+                return;
+            }
+            console.log("WebSocket disconnected. Retrying in 5s...");
+            if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+            reconnectTimeout.current = setTimeout(connectWS, 5000);
+        };
 
-    ws.onclose = () => {
-        setConnectionActive(false);
-        console.log("WebSocket disconnected. Retrying in 5s...");
-        if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+        ws.onerror = (err) => {
+            console.error("WebSocket error:", err);
+            ws.close();
+        };
+    } catch (e) {
+        console.error("Failed to connect to logs WebSocket:", e);
         reconnectTimeout.current = setTimeout(connectWS, 5000);
-    };
-
-    ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        ws.close();
-    };
+    }
   };
 
   // BUG-7 fix: WebSocket connection — independent of activeLog tab

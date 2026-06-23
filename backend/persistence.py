@@ -1,36 +1,55 @@
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import json
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any, Tuple
 from models import AuditLog, LabAnalysis, GalleryItem, TrustScore, UserProfile, Badge, LiveMetric
+import os
+from pgvector.psycopg2 import register_vector
 
-from pathlib import Path
-
-# Database File Path
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "vault.db"
+# Database Connection URI
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", 
+    "postgresql://aether_user:aether_password@localhost:5432/aether_db"
+)
 
 
 class AetherVault:
     """
     The Memory Layer.
-    Manages persistence for the Aether ecosystem.
+    Manages persistence for the Aether ecosystem using PostgreSQL + pgvector.
     """
     def __init__(self):
         self._init_db()
 
     def _get_conn(self):
         """
-        Returns a thread-safe connection to the SQLite database.
-        check_same_thread=False is essential for FastAPI's async/threading model.
+        Returns a connection to the PostgreSQL database.
+        Registers pgvector support on it.
         """
-        return sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn = psycopg2.connect(DATABASE_URL)
+        register_vector(conn)
+        return conn
 
     def _init_db(self):
         """
-        Initialize the SQLite database schema.
+        Initialize the PostgreSQL database schema.
+        Creates pgvector extension first.
         """
+        # First connection to ensure extension exists
+        conn = psycopg2.connect(DATABASE_URL)
+        c = conn.cursor()
+        try:
+            c.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"[Vault] Failed to create vector extension: {e}")
+        finally:
+            conn.close()
+
+        # Reconnect to build tables (now vector extension is loaded, we can use _get_conn)
         conn = self._get_conn()
         c = conn.cursor()
         
@@ -40,50 +59,29 @@ class AetherVault:
                         last_updated TIMESTAMP,
                         trust_score REAL,
                         intent_category TEXT,
-                        analysis_json TEXT,  -- Storing complex objects as JSON for MVP flexibility
+                        analysis_json TEXT,  -- JSON string
                         gallery_json TEXT,
-                        embedding_json TEXT,  -- Storing numpy vectors as JSON array
-                        is_active INTEGER DEFAULT 1 -- 1 for active, 0 for hidden
+                        embedding_json TEXT,  -- JSON string array (unused)
+                        embedding_blob BYTEA,  -- float32 bytes representation
+                        is_active INTEGER DEFAULT 1, -- 1 for active, 0 for hidden
+                        audit_pending INTEGER DEFAULT 0,
+                        embedding vector(768)  -- pgvector column
                     )''')
         
         c.execute('''CREATE TABLE IF NOT EXISTS scout_tasks (
-                task_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tool_name TEXT,
-                url TEXT,
-                submitter_email TEXT,
-                status TEXT DEFAULT 'pending', -- pending, scanning, completed, failed
-                error_message TEXT,
-                created_at TIMESTAMP,
-                updated_at TIMESTAMP
-            )''')
-                    
-        # Apply schema migration for is_active column
-        try:
-             c.execute("ALTER TABLE verified_tools ADD COLUMN is_active INTEGER DEFAULT 1")
-        except sqlite3.OperationalError:
-             pass # Column already exists
-             
-        # Apply schema migration if embedding_json is missing
-        try:
-             c.execute("ALTER TABLE verified_tools ADD COLUMN embedding_json TEXT")
-        except sqlite3.OperationalError:
-             pass # Column already exists
-
-        # Migration: Add embedding_blob column for FastEmbed binary vectors
-        try:
-             c.execute("ALTER TABLE verified_tools ADD COLUMN embedding_blob BLOB")
-        except sqlite3.OperationalError:
-             pass # Column already exists
-
-        # Migration: Add audit_pending column for Local Factory polling bridge
-        try:
-             c.execute("ALTER TABLE verified_tools ADD COLUMN audit_pending INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-             pass # Column already exists
+                        task_id SERIAL PRIMARY KEY,
+                        tool_name TEXT,
+                        url TEXT,
+                        submitter_email TEXT,
+                        status TEXT DEFAULT 'pending', -- pending, scanning, completed, failed
+                        error_message TEXT,
+                        created_at TIMESTAMP,
+                        updated_at TIMESTAMP
+                    )''')
 
         # 2. Audit History (The Trail)
         c.execute('''CREATE TABLE IF NOT EXISTS audit_history (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id SERIAL PRIMARY KEY,
                         tool_name TEXT,
                         timestamp TIMESTAMP,
                         action TEXT,
@@ -98,9 +96,9 @@ class AetherVault:
                         PRIMARY KEY (tool_name, keyword)
                     )''')
 
-        # 4. Search Analytics (New for Phase 5)
+        # 4. Search Analytics
         c.execute('''CREATE TABLE IF NOT EXISTS search_queries (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id SERIAL PRIMARY KEY,
                         query_text TEXT,
                         timestamp TIMESTAMP,
                         has_match INTEGER -- 1 for match (results found), 0 for miss
@@ -119,10 +117,9 @@ class AetherVault:
                         last_active TIMESTAMP
                     )''')
 
-
         # 6. Elo Battles History
         c.execute('''CREATE TABLE IF NOT EXISTS elo_battles (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id SERIAL PRIMARY KEY,
                         tool_a TEXT,
                         tool_b TEXT,
                         winner TEXT,
@@ -132,9 +129,9 @@ class AetherVault:
                         voter_uid TEXT
                     )''')
         
-        # 7. Live Benchmarks (Phase 8)
+        # 7. Live Benchmarks
         c.execute('''CREATE TABLE IF NOT EXISTS live_metrics (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id SERIAL PRIMARY KEY,
                         tool_name TEXT,
                         provider TEXT,
                         latency_ms REAL,
@@ -157,11 +154,13 @@ class AetherVault:
                     )''')
         
         # Seed default settings row if missing
-        c.execute("INSERT OR IGNORE INTO sentinel_settings (id, enabled, alert_email, frequency_minutes, failure_threshold, current_failures) VALUES (1, 0, '', 30, 3, 0)")
+        c.execute("""INSERT INTO sentinel_settings (id, enabled, alert_email, frequency_minutes, failure_threshold, current_failures) 
+                     VALUES (1, 0, '', 30, 3, 0)
+                     ON CONFLICT (id) DO NOTHING""")
 
         # 9. Sentinel Audit Logs
         c.execute('''CREATE TABLE IF NOT EXISTS sentinel_audit_logs (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id SERIAL PRIMARY KEY,
                         timestamp TIMESTAMP,
                         status TEXT,
                         message TEXT,
@@ -170,11 +169,37 @@ class AetherVault:
                         email_sent INTEGER DEFAULT 0
                     )''')
 
-        # Migration: Add reason column to elo_battles if it doesn't exist
-        try:
-             c.execute("ALTER TABLE elo_battles ADD COLUMN reason TEXT")
-        except sqlite3.OperationalError:
-             pass # Column already exists
+        # 10. Semantic Cache Table
+        c.execute('''CREATE TABLE IF NOT EXISTS semantic_cache (
+                        id SERIAL PRIMARY KEY,
+                        query_text TEXT UNIQUE,
+                        embedding_blob BYTEA,
+                        tool_name TEXT,
+                        timestamp TIMESTAMP
+                    )''')
+
+        # 11. Vector HNSW Index for pgvector
+        c.execute('''CREATE INDEX IF NOT EXISTS verified_tools_embedding_hnsw_idx 
+                     ON verified_tools USING hnsw (embedding vector_cosine_ops);''')
+
+        # 12. Staging Tools (Ingestion Pipeline)
+        c.execute('''CREATE TABLE IF NOT EXISTS staging_tools (
+                        id SERIAL PRIMARY KEY,
+                        tool_name TEXT UNIQUE,
+                        source TEXT DEFAULT 'bulk_seed',
+                        raw_data TEXT,
+                        processed_data TEXT,
+                        trust_score REAL DEFAULT 0,
+                        category TEXT,
+                        embedding vector(768),
+                        embedding_blob BYTEA,
+                        processing_status TEXT DEFAULT 'pending',
+                        processing_log TEXT DEFAULT '',
+                        ingested_at TIMESTAMP,
+                        processed_at TIMESTAMP,
+                        reviewed_at TIMESTAMP,
+                        reviewer_notes TEXT
+                    )''')
 
         conn.commit()
         conn.close()
@@ -182,7 +207,7 @@ class AetherVault:
     def save_tool(self, tool_name: str, analysis: LabAnalysis, trust_score: float, gallery: List[GalleryItem], audit_log: AuditLog, embedding: Optional[bytes] = None, is_active: int = 1):
         """
         Saves a fully verified tool to the Vault.
-        `embedding` should be raw bytes from numpy ndarray.tobytes() (float32, 384 dims).
+        `embedding` should be raw bytes from numpy ndarray.tobytes() (float32, 768 dims).
         """
         conn = self._get_conn()
         c = conn.cursor()
@@ -194,7 +219,7 @@ class AetherVault:
         
         # Protect existing gallery data if update sends an empty list
         if not gallery:
-            c.execute("SELECT gallery_json FROM verified_tools WHERE tool_name = ?", (tool_name.lower(),))
+            c.execute("SELECT gallery_json FROM verified_tools WHERE tool_name = %s", (tool_name.lower(),))
             row = c.fetchone()
             if row and row[0]:
                 gallery_json = row[0]
@@ -203,34 +228,48 @@ class AetherVault:
         else:
             gallery_json = json.dumps([item.dict() for item in gallery], default=str)
         
-        # Handle binary embedding: keep old if new is not provided
+        # Handle binary embedding & pgvector: keep old if new is not provided
         embedding_blob = None
+        embedding_vector = None
         if embedding is not None:
              embedding_blob = embedding  # Already raw bytes
+             embedding_vector = np.frombuffer(embedding, dtype=np.float32).tolist()
         else:
-             c.execute("SELECT embedding_blob FROM verified_tools WHERE tool_name = ?", (tool_name.lower(),))
+             c.execute("SELECT embedding_blob FROM verified_tools WHERE tool_name = %s", (tool_name.lower(),))
              row = c.fetchone()
              if row and row[0]:
-                  embedding_blob = row[0]
-                  
-        # Upsert into Verified Tools
-        c.execute('''INSERT OR REPLACE INTO verified_tools 
-                     (tool_name, last_updated, trust_score, intent_category, analysis_json, gallery_json, embedding_json, embedding_blob, is_active)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (tool_name.lower(), timestamp, trust_score, str(analysis.job_to_be_done), analysis_json, gallery_json, None, embedding_blob, is_active))
+                  embedding_blob = bytes(row[0])
+                  embedding_vector = np.frombuffer(embedding_blob, dtype=np.float32).tolist()
+                   
+        # Upsert into Verified Tools using ON CONFLICT for PostgreSQL
+        c.execute('''INSERT INTO verified_tools 
+                     (tool_name, last_updated, trust_score, intent_category, analysis_json, gallery_json, embedding_json, embedding_blob, is_active, embedding)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     ON CONFLICT (tool_name) DO UPDATE SET
+                         last_updated = EXCLUDED.last_updated,
+                         trust_score = EXCLUDED.trust_score,
+                         intent_category = EXCLUDED.intent_category,
+                         analysis_json = EXCLUDED.analysis_json,
+                         gallery_json = EXCLUDED.gallery_json,
+                         embedding_json = EXCLUDED.embedding_json,
+                         embedding_blob = EXCLUDED.embedding_blob,
+                         is_active = EXCLUDED.is_active,
+                         embedding = EXCLUDED.embedding''',
+                  (tool_name.lower(), timestamp, trust_score, str(analysis.job_to_be_done), analysis_json, gallery_json, None, psycopg2.Binary(embedding_blob) if embedding_blob else None, is_active, embedding_vector))
         
         # Log Audit
         c.execute('''INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)
-                     VALUES (?, ?, ?, ?, ?)''',
+                     VALUES (%s, %s, %s, %s, %s)''',
                   (tool_name.lower(), timestamp, audit_log.action, audit_log.reason, audit_log.new_trust_score))
         
         # Update Search Index (Basic Keyword Mapping)
         # Clear old keywords first
-        c.execute("DELETE FROM search_index WHERE tool_name = ?", (tool_name.lower(),))
+        c.execute("DELETE FROM search_index WHERE tool_name = %s", (tool_name.lower(),))
         
         keywords = set(analysis.job_to_be_done + [tool_name.lower()] + analysis.tool_name.lower().split())
         for kw in keywords:
-            c.execute("INSERT OR IGNORE INTO search_index (tool_name, keyword) VALUES (?, ?)", (tool_name.lower(), kw.lower()))
+            c.execute("""INSERT INTO search_index (tool_name, keyword) VALUES (%s, %s) 
+                         ON CONFLICT (tool_name, keyword) DO NOTHING""", (tool_name.lower(), kw.lower()))
 
         conn.commit()
         conn.close()
@@ -246,13 +285,16 @@ class AetherVault:
         tool_name_lower = tool_name.lower()
         
         # 1. Delete from search index
-        c.execute("DELETE FROM search_index WHERE tool_name = ?", (tool_name_lower,))
+        c.execute("DELETE FROM search_index WHERE tool_name = %s", (tool_name_lower,))
         
         # 2. Delete from audit history
-        c.execute("DELETE FROM audit_history WHERE tool_name = ?", (tool_name_lower,))
+        c.execute("DELETE FROM audit_history WHERE tool_name = %s", (tool_name_lower,))
         
-        # 3. Delete from verified tools
-        c.execute("DELETE FROM verified_tools WHERE tool_name = ?", (tool_name_lower,))
+        # 3. Delete from semantic cache
+        c.execute("DELETE FROM semantic_cache WHERE tool_name = %s", (tool_name_lower,))
+        
+        # 4. Delete from verified tools
+        c.execute("DELETE FROM verified_tools WHERE tool_name = %s", (tool_name_lower,))
         
         conn.commit()
         conn.close()
@@ -266,7 +308,9 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         
-        c.execute("UPDATE verified_tools SET embedding_blob = ? WHERE tool_name = ?", (embedding_bytes, tool_name.lower()))
+        vector = np.frombuffer(embedding_bytes, dtype=np.float32).tolist()
+        c.execute("UPDATE verified_tools SET embedding_blob = %s, embedding = %s WHERE tool_name = %s", 
+                  (psycopg2.Binary(embedding_bytes), vector, tool_name.lower()))
         
         conn.commit()
         conn.close()
@@ -279,8 +323,7 @@ class AetherVault:
         Reconstructs numpy arrays from binary BLOB using np.frombuffer.
         """
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         c.execute("SELECT tool_name, trust_score, embedding_blob, analysis_json, is_active FROM verified_tools WHERE is_active = 1")
         rows = c.fetchall()
@@ -288,24 +331,70 @@ class AetherVault:
         
         results = []
         for row in rows:
-            row_dict = dict(row)
-            blob = row_dict['embedding_blob']
+            blob = row['embedding_blob']
             if not blob:
                 continue  # Skip tools without embeddings
             
-            # CRITICAL: Reconstruct numpy array from raw bytes
-            vector = np.frombuffer(blob, dtype=np.float32)
-            analysis_json = row_dict['analysis_json']
+            # CRITICAL: Reconstruct numpy array from bytes
+            vector = np.frombuffer(bytes(blob), dtype=np.float32)
+            analysis_json = row['analysis_json']
             analysis = json.loads(analysis_json) if analysis_json else {}
             
             results.append((
-                row_dict['tool_name'],
-                row_dict['trust_score'],
+                row['tool_name'],
+                row['trust_score'],
                 vector,
                 analysis,
-                row_dict['is_active']
+                row['is_active']
             ))
         
+        return results
+
+    def save_semantic_cache(self, query_text: str, embedding_bytes: bytes, tool_name: str):
+        """
+        Saves a query and its embedding to the semantic cache.
+        """
+        conn = self._get_conn()
+        c = conn.cursor()
+        timestamp = datetime.now()
+        try:
+            c.execute('''INSERT INTO semantic_cache 
+                         (query_text, embedding_blob, tool_name, timestamp)
+                         VALUES (%s, %s, %s, %s)
+                         ON CONFLICT (query_text) DO UPDATE SET 
+                         embedding_blob = EXCLUDED.embedding_blob,
+                         tool_name = EXCLUDED.tool_name,
+                         timestamp = EXCLUDED.timestamp''',
+                      (query_text.strip().lower(), psycopg2.Binary(embedding_bytes), tool_name.lower(), timestamp))
+            conn.commit()
+            print(f"[Vault] Semantic cache saved for query '{query_text}' -> tool '{tool_name}'.")
+        except Exception as e:
+            print(f"[Vault Error] Failed to save semantic cache: {e}")
+        finally:
+            conn.close()
+
+    def get_all_semantic_cache(self) -> List[Tuple[str, np.ndarray, str]]:
+        """
+        Loads all semantic cache entries.
+        Returns list of (query_text, embedding_vector, tool_name).
+        """
+        conn = self._get_conn()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("SELECT query_text, embedding_blob, tool_name FROM semantic_cache")
+        rows = c.fetchall()
+        conn.close()
+        
+        results = []
+        for row in rows:
+            blob = row['embedding_blob']
+            if not blob:
+                continue
+            vector = np.frombuffer(bytes(blob), dtype=np.float32)
+            results.append((
+                row['query_text'],
+                vector,
+                row['tool_name']
+            ))
         return results
 
     def get_tool(self, tool_identifier: str, include_expired: bool = False) -> Optional[Dict]:
@@ -314,20 +403,19 @@ class AetherVault:
         Can query by exact tool_name or slugified id.
         """
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Try exact match first (Explicit columns to avoid binary blob leakage)
         c.execute("""SELECT tool_name, last_updated, trust_score, intent_category, 
                             analysis_json, gallery_json, is_active 
-                     FROM verified_tools WHERE tool_name = ?""", (tool_identifier.lower(),))
+                     FROM verified_tools WHERE tool_name = %s""", (tool_identifier.lower(),))
         row = c.fetchone()
         
         # Try slug match if not found
         if not row:
             c.execute("""SELECT tool_name, last_updated, trust_score, intent_category, 
                                 analysis_json, gallery_json, is_active 
-                         FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = ?""", (tool_identifier.lower(),))
+                         FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = %s""", (tool_identifier.lower(),))
             row = c.fetchone()
             
         # Try a relaxed LIKE match if still not found
@@ -335,7 +423,7 @@ class AetherVault:
             search_pattern = f"%{tool_identifier.lower()}%"
             c.execute("""SELECT tool_name, last_updated, trust_score, intent_category, 
                                 analysis_json, gallery_json, is_active 
-                         FROM verified_tools WHERE lower(tool_name) LIKE ? LIMIT 1""", (search_pattern,))
+                         FROM verified_tools WHERE lower(tool_name) LIKE %s LIMIT 1""", (search_pattern,))
             row = c.fetchone()
             
         conn.close()
@@ -343,27 +431,26 @@ class AetherVault:
         if not row:
             return None
             
-        row_dict = dict(row)
-            
-        # Expiration Logic (90 Days - Extended for better UX / development)
-        last_updated = datetime.fromisoformat(str(row_dict['last_updated']))
+        # Expiration Logic (90 Days)
+        last_updated = row['last_updated']
         if datetime.now() - last_updated > timedelta(days=90):
             if include_expired:
-                print(f"[Vault] Tool '{row_dict['tool_name']}' is EXPIRED but returning anyway due to override.")
+                print(f"[Vault] Tool '{row['tool_name']}' is EXPIRED but returning anyway due to override.")
             else:
-                print(f"[Vault] Tool '{row_dict['tool_name']}' found but EXPIRED. Triggering Pulse Check.")
+                print(f"[Vault] Tool '{row['tool_name']}' found but EXPIRED. Triggering Pulse Check.")
                 return None # Treat as not found to trigger re-verification
             
         # Reconstruct Data
-        tool_name = row_dict['tool_name']
+        tool_name = row['tool_name']
         slug_id = tool_name.strip().lower().replace(' ', '-')
         return {
             "id": slug_id,
             "tool_name": tool_name,
-            "last_updated": row_dict['last_updated'],
-            "trust_score": row_dict['trust_score'],
-            "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {},
-            "is_active": bool(row_dict['is_active']),
+            "last_updated": row['last_updated'].isoformat(),
+            "trust_score": row['trust_score'],
+            "analysis": json.loads(row['analysis_json']) if row['analysis_json'] else {},
+            "gallery": json.loads(row['gallery_json']) if row['gallery_json'] else [],
+            "is_active": bool(row['is_active']),
             "status": "success" # Implicitly success if in DB
         }
 
@@ -372,8 +459,7 @@ class AetherVault:
         Searches the Vault for tools matching the query (Intent or Name).
         """
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         where_clause = " WHERE is_active = 1 " if not include_inactive else " WHERE 1=1 "
         
@@ -383,27 +469,26 @@ class AetherVault:
                          FROM verified_tools {where_clause}""")
         else:
             # Simple LIKE search on the index
+            and_clause = " AND is_active = 1 " if not include_inactive else ""
             c.execute(f'''SELECT DISTINCT vt.tool_name, vt.trust_score, vt.analysis_json, vt.gallery_json, vt.is_active 
                          FROM verified_tools vt
                          JOIN search_index si ON vt.tool_name = si.tool_name
-                         {where_clause.replace("WHERE", "AND")}
-                         AND si.keyword LIKE ?''', (f"%{query.lower()}%",))
+                         WHERE si.keyword LIKE %s {and_clause}''', (f"%{query.lower()}%",))
         
         rows = c.fetchall()
         conn.close()
         
         results = []
         for row in rows:
-            row_dict = dict(row)
-            tool_name = row_dict['tool_name']
+            tool_name = row['tool_name']
             slug_id = tool_name.strip().lower().replace(' ', '-')
             results.append({
                 "id": slug_id,
                 "tool_name": tool_name,
-                "trust_score": row_dict['trust_score'],
-                "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {},
-                "gallery": json.loads(row_dict['gallery_json']) if row_dict['gallery_json'] else [],
-                "is_active": bool(row_dict['is_active']),
+                "trust_score": row['trust_score'],
+                "analysis": json.loads(row['analysis_json']) if row['analysis_json'] else {},
+                "gallery": json.loads(row['gallery_json']) if row['gallery_json'] else [],
+                "is_active": bool(row['is_active']),
             })
             
         return results
@@ -440,12 +525,12 @@ class AetherVault:
                              unique_intents.add(desc.lower().strip())
                  except Exception:
                      pass
-                     
+                      
          conn.close()
          return {
              "verified_tools_count": count,
              "total_intents_mapped": len(unique_intents),
-             "last_scan_date": last_scan
+             "last_scan_date": last_scan.isoformat() if last_scan else None
          }
 
     # --- Phase 5: Analytics & Admin Controls ---
@@ -454,7 +539,7 @@ class AetherVault:
         """Logs a search query to the database."""
         conn = self._get_conn()
         c = conn.cursor()
-        c.execute("INSERT INTO search_queries (query_text, timestamp, has_match) VALUES (?, ?, ?)",
+        c.execute("INSERT INTO search_queries (query_text, timestamp, has_match) VALUES (%s, %s, %s)",
                   (query_text, datetime.now(), 1 if has_match else 0))
         conn.commit()
         conn.close()
@@ -462,17 +547,23 @@ class AetherVault:
     def get_search_analytics(self, limit: int = 50) -> List[Dict]:
         """Fetches the latest search queries for the admin dashboard."""
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM search_queries ORDER BY timestamp DESC LIMIT ?", (limit,))
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("SELECT id, query_text, timestamp, has_match FROM search_queries ORDER BY timestamp DESC LIMIT %s", (limit,))
         rows = c.fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get('timestamp'):
+                d['timestamp'] = d['timestamp'].isoformat()
+            results.append(d)
+        return results
 
     def update_tool_status(self, tool_name: str, status: int):
         conn = self._get_conn()
         c = conn.cursor()
-        c.execute("UPDATE verified_tools SET is_active = ? WHERE tool_name = ?", (status, tool_name.lower()))
+        c.execute("UPDATE verified_tools SET is_active = %s WHERE tool_name = %s", (status, tool_name.lower()))
         conn.commit()
         conn.close()
 
@@ -484,9 +575,9 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         now = datetime.now()
-        c.execute("INSERT INTO scout_tasks (tool_name, url, submitter_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        c.execute("INSERT INTO scout_tasks (tool_name, url, submitter_email, created_at, updated_at) VALUES (%s, %s, %s, %s, %s) RETURNING task_id",
                   (tool_name, url, email, now, now))
-        task_id = c.lastrowid
+        task_id = c.fetchone()[0]
         conn.commit()
         conn.close()
         return task_id
@@ -495,31 +586,37 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         if final_tool_name:
-            c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ?, tool_name = ? WHERE task_id = ?",
+            c.execute("UPDATE scout_tasks SET status = %s, error_message = %s, updated_at = %s, tool_name = %s WHERE task_id = %s",
                       (status, error_message, datetime.now(), final_tool_name, task_id))
         else:
-            c.execute("UPDATE scout_tasks SET status = ?, error_message = ?, updated_at = ? WHERE task_id = ?",
+            c.execute("UPDATE scout_tasks SET status = %s, error_message = %s, updated_at = %s WHERE task_id = %s",
                       (status, error_message, datetime.now(), task_id))
         conn.commit()
         conn.close()
 
     def get_live_scans(self) -> List[Dict]:
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        # Keep only recent tasks or non-completed ones
-        c.execute("SELECT * FROM scout_tasks WHERE status IN ('pending', 'scanning', 'failed') OR (status = 'completed' AND updated_at > datetime('now', '-1 hour')) ORDER BY updated_at DESC")
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("SELECT * FROM scout_tasks WHERE status IN ('pending', 'scanning', 'failed') OR (status = 'completed' AND updated_at > NOW() - INTERVAL '1 hour') ORDER BY updated_at DESC")
         rows = c.fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get('created_at'):
+                d['created_at'] = d['created_at'].isoformat()
+            if d.get('updated_at'):
+                d['updated_at'] = d['updated_at'].isoformat()
+            results.append(d)
+        return results
 
     def get_pending_tools(self) -> List[Dict]:
         """
         Fetches all tools that are currently hidden (is_active = 0) for admin review.
         """
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         c.execute("""SELECT tool_name, last_updated, trust_score, analysis_json, is_active 
                      FROM verified_tools 
                      WHERE is_active = 0 
@@ -529,15 +626,14 @@ class AetherVault:
         
         results = []
         for row in rows:
-            row_dict = dict(row)
-            tool_name = row_dict['tool_name']
+            tool_name = row['tool_name']
             slug_id = tool_name.strip().lower().replace(' ', '-')
             results.append({
                 "id": slug_id,
                 "tool_name": tool_name,
-                "trust_score": row_dict['trust_score'],
-                "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {},
-                "last_updated": row_dict['last_updated']
+                "trust_score": row['trust_score'],
+                "analysis": json.loads(row['analysis_json']) if row['analysis_json'] else {},
+                "last_updated": row['last_updated'].isoformat() if row['last_updated'] else None
             })
         return results
 
@@ -546,13 +642,12 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         
-        # We need to update analysis_json to persist the pricing change
-        c.execute("SELECT analysis_json FROM verified_tools WHERE tool_name = ?", (tool_name.lower(),))
+        c.execute("SELECT analysis_json FROM verified_tools WHERE tool_name = %s", (tool_name.lower(),))
         row = c.fetchone()
         if row and row[0]:
             analysis_dict = json.loads(row[0])
             analysis_dict["metrics"]["pricing"] = new_pricing
-            c.execute("UPDATE verified_tools SET analysis_json = ? WHERE tool_name = ?", (json.dumps(analysis_dict), tool_name.lower()))
+            c.execute("UPDATE verified_tools SET analysis_json = %s WHERE tool_name = %s", (json.dumps(analysis_dict), tool_name.lower()))
             conn.commit()
         
         conn.close()
@@ -561,10 +656,9 @@ class AetherVault:
 
     def get_or_create_user(self, uid: str, email: str, display_name: Optional[str] = None) -> UserProfile:
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        c.execute("SELECT * FROM users WHERE uid = ?", (uid,))
+        c.execute("SELECT * FROM users WHERE uid = %s", (uid,))
         row = c.fetchone()
         
         if row:
@@ -577,15 +671,15 @@ class AetherVault:
                 badges=json.loads(row['badges_json']),
                 contributions_count=row['contributions_count'],
                 votes_count=row['votes_count'],
-                last_active=datetime.fromisoformat(row['last_active']) if row['last_active'] else datetime.now(),
+                last_active=row['last_active'] if row['last_active'] else datetime.now(),
             )
             # Update last active
-            c.execute("UPDATE users SET last_active = ? WHERE uid = ?", (datetime.now(), uid))
+            c.execute("UPDATE users SET last_active = %s WHERE uid = %s", (datetime.now(), uid))
             conn.commit()
         else:
             user = UserProfile(uid=uid, email=email, display_name=display_name)
             c.execute('''INSERT INTO users (uid, email, display_name, points, elo, badges_json, last_active)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                         VALUES (%s, %s, %s, %s, %s, %s, %s)''',
                       (uid, email, display_name, user.points, user.elo, json.dumps(user.badges), user.last_active))
             conn.commit()
             
@@ -596,44 +690,33 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         c.execute('''UPDATE users SET 
-                     display_name = ?, points = ?, elo = ?, badges_json = ?, 
-                     contributions_count = ?, votes_count = ?, last_active = ?
-                     WHERE uid = ?''',
+                     display_name = %s, points = %s, elo = %s, badges_json = %s, 
+                     contributions_count = %s, votes_count = %s, last_active = %s
+                     WHERE uid = %s''',
                   (user.display_name, user.points, user.elo, json.dumps(user.badges), 
                    user.contributions_count, user.votes_count, datetime.now(), user.uid))
         conn.commit()
         conn.close()
 
-
-
     def get_user_rankings(self, limit: int = 10) -> List[Dict]:
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT display_name, email, points, elo, badges_json FROM users ORDER BY points DESC LIMIT ?", (limit,))
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("SELECT display_name, email, points, elo, badges_json FROM users ORDER BY points DESC LIMIT %s", (limit,))
         rows = c.fetchall()
         conn.close()
         return [dict(r) for r in rows]
-
-
-
-
 
     def get_vendor_insights(self, tool_name: str) -> Dict:
         """
         Gathers intelligence for a specific tool vendor.
         """
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         name_lower = tool_name.lower()
         
-        # 3. Missed Searches (Market Demand)
-        # We look for queries that have NO match and might be relevant to this tool's category
-        c.execute("SELECT intent_category FROM verified_tools WHERE tool_name = ?", (name_lower,))
+        c.execute("SELECT intent_category FROM verified_tools WHERE tool_name = %s", (name_lower,))
         cat_row = c.fetchone()
-        tool_category = cat_row[0] if cat_row else ""
         
         c.execute('''SELECT query_text, COUNT(*) as count FROM search_queries 
                      WHERE has_match = 0 
@@ -658,7 +741,7 @@ class AetherVault:
         c = conn.cursor()
         c.execute('''INSERT INTO live_metrics 
                      (tool_name, provider, latency_ms, hallucination_score, timestamp, status, comparison_vs_avg)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                     VALUES (%s, %s, %s, %s, %s, %s, %s)''',
                   (metric.tool_name, metric.provider, metric.latency_ms, metric.hallucination_score, 
                    metric.timestamp, metric.status, metric.comparison_vs_avg))
         conn.commit()
@@ -669,15 +752,21 @@ class AetherVault:
         Fetches the latest live benchmarks for each major provider.
         """
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         # Get the latest entry for each tool_name
         c.execute('''SELECT * FROM live_metrics 
                      WHERE id IN (SELECT MAX(id) FROM live_metrics GROUP BY tool_name)
-                     ORDER BY timestamp DESC LIMIT ?''', (limit,))
+                     ORDER BY timestamp DESC LIMIT %s''', (limit,))
         rows = c.fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get('timestamp'):
+                d['timestamp'] = d['timestamp'].isoformat()
+            results.append(d)
+        return results
 
     def prune_live_metrics(self, hours: int = 24):
         """
@@ -686,7 +775,7 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         cutoff = datetime.now() - timedelta(hours=hours)
-        c.execute("DELETE FROM live_metrics WHERE timestamp < ?", (cutoff,))
+        c.execute("DELETE FROM live_metrics WHERE timestamp < %s", (cutoff,))
         conn.commit()
         conn.close()
         print(f"[Vault] Pruned metrics older than {hours} hours.")
@@ -696,8 +785,7 @@ class AetherVault:
     def get_audit_pending_tools(self) -> List[Dict]:
         """Fetches all tools with audit_pending = 1 for the Local AI Factory to process."""
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         c.execute("""SELECT tool_name, trust_score, analysis_json 
                      FROM verified_tools 
                      WHERE audit_pending = 1""")
@@ -706,14 +794,13 @@ class AetherVault:
         
         results = []
         for row in rows:
-            row_dict = dict(row)
-            tool_name = row_dict['tool_name']
+            tool_name = row['tool_name']
             slug_id = tool_name.strip().lower().replace(' ', '-')
             results.append({
                 "id": slug_id,
                 "tool_name": tool_name,
-                "trust_score": row_dict['trust_score'],
-                "analysis": json.loads(row_dict['analysis_json']) if row_dict['analysis_json'] else {}
+                "trust_score": row['trust_score'],
+                "analysis": json.loads(row['analysis_json']) if row['analysis_json'] else {}
             })
         return results
 
@@ -722,9 +809,7 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         
-        # We need to find the exact tool name based on the slug tool_id or tool_name
-        search_pattern = f"%{tool_id.lower()}%"
-        c.execute("SELECT tool_name FROM verified_tools WHERE lower(tool_name) = ? OR replace(lower(tool_name), ' ', '-') = ?", 
+        c.execute("SELECT tool_name FROM verified_tools WHERE lower(tool_name) = %s OR replace(lower(tool_name), ' ', '-') = %s", 
                   (tool_id.lower(), tool_id.lower()))
         row = c.fetchone()
         
@@ -733,7 +818,7 @@ class AetherVault:
             return False
             
         actual_name = row[0]
-        c.execute("UPDATE verified_tools SET audit_pending = ? WHERE tool_name = ?", (1 if pending else 0, actual_name))
+        c.execute("UPDATE verified_tools SET audit_pending = %s WHERE tool_name = %s", (1 if pending else 0, actual_name))
         conn.commit()
         conn.close()
         return True
@@ -745,7 +830,7 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         
-        c.execute("SELECT tool_name, analysis_json, gallery_json FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = ? OR lower(tool_name) = ?", 
+        c.execute("SELECT tool_name, analysis_json, gallery_json FROM verified_tools WHERE replace(lower(tool_name), ' ', '-') = %s OR lower(tool_name) = %s", 
                   (tool_id.lower(), tool_id.lower()))
         row = c.fetchone()
         
@@ -770,17 +855,17 @@ class AetherVault:
         clean_gallery = [g for g in gallery if not UNSPLASH_PATTERN.search(g.get('media_url', ''))]
         
         c.execute("""UPDATE verified_tools 
-                     SET trust_score = ?, 
-                         analysis_json = ?, 
-                         gallery_json = ?, 
+                     SET trust_score = %s, 
+                         analysis_json = %s, 
+                         gallery_json = %s, 
                          audit_pending = 0,
-                         last_updated = ?
-                     WHERE tool_name = ?""",
+                         last_updated = %s
+                     WHERE tool_name = %s""",
                   (trust_score, json.dumps(analysis), json.dumps(clean_gallery), datetime.now(), actual_name))
                   
         # Add to audit history
         c.execute("""INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)
-                     VALUES (?, ?, ?, ?, ?)""",
+                     VALUES (%s, %s, %s, %s, %s)""",
                   (actual_name, datetime.now(), "Factory Audit - Phase 3 (Bridge)", "Automated re-audit via Worker Polling", trust_score))
         
         conn.commit()
@@ -790,13 +875,15 @@ class AetherVault:
     def get_sentinel_settings(self) -> Dict[str, Any]:
         """Retrieves the Aether Sentinel settings."""
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         c.execute("SELECT * FROM sentinel_settings WHERE id = 1")
         row = c.fetchone()
         conn.close()
         if row:
-            return dict(row)
+            d = dict(row)
+            if d.get('last_run_timestamp'):
+                d['last_run_timestamp'] = d['last_run_timestamp'].isoformat()
+            return d
         return {
             "id": 1,
             "enabled": 0,
@@ -813,10 +900,10 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("""UPDATE sentinel_settings 
-                     SET enabled = ?, 
-                         alert_email = ?, 
-                         frequency_minutes = ?, 
-                         failure_threshold = ?,
+                     SET enabled = %s, 
+                         alert_email = %s, 
+                         frequency_minutes = %s, 
+                         failure_threshold = %s,
                          current_failures = 0
                      WHERE id = 1""", 
                   (enabled, alert_email, frequency_minutes, failure_threshold))
@@ -829,9 +916,9 @@ class AetherVault:
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("""UPDATE sentinel_settings 
-                     SET current_failures = ?, 
-                         last_status = ?, 
-                         last_run_timestamp = ? 
+                     SET current_failures = %s, 
+                         last_status = %s, 
+                         last_run_timestamp = %s 
                      WHERE id = 1""", 
                   (current_failures, last_status, datetime.now()))
         conn.commit()
@@ -844,7 +931,7 @@ class AetherVault:
         c = conn.cursor()
         c.execute("""INSERT INTO sentinel_audit_logs 
                      (timestamp, status, message, database_status, memory_usage_mb, email_sent) 
-                     VALUES (?, ?, ?, ?, ?, ?)""", 
+                     VALUES (%s, %s, %s, %s, %s, %s)""", 
                   (datetime.now(), status, message, database_status, memory_usage_mb, email_sent))
         conn.commit()
         conn.close()
@@ -852,9 +939,341 @@ class AetherVault:
     def get_sentinel_audit_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Retrieves historical health checks of Aether Sentinel."""
         conn = self._get_conn()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM sentinel_audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,))
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("SELECT * FROM sentinel_audit_logs ORDER BY timestamp DESC LIMIT %s", (limit,))
         rows = c.fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get('timestamp'):
+                d['timestamp'] = d['timestamp'].isoformat()
+            results.append(d)
+        return results
+
+    # --- Staging Pipeline ---
+
+    def save_staging_tool(self, tool_name: str, source: str = 'bulk_seed',
+                          raw_data: str = '', category: str = '') -> int:
+        """
+        Inserts a new tool into the staging table.
+        Skips duplicates (both staging and verified).
+        Returns the staging ID, or -1 if duplicate.
+        """
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        # Check duplicates in verified_tools
+        c.execute("SELECT 1 FROM verified_tools WHERE lower(tool_name) = %s", (tool_name.lower(),))
+        if c.fetchone():
+            conn.close()
+            return -1  # Already in live vault
+        
+        # Check duplicates in staging
+        c.execute("SELECT id FROM staging_tools WHERE lower(tool_name) = %s", (tool_name.lower(),))
+        existing = c.fetchone()
+        if existing:
+            conn.close()
+            return -1  # Already staged
+        
+        try:
+            c.execute("""INSERT INTO staging_tools 
+                         (tool_name, source, raw_data, category, processing_status, ingested_at)
+                         VALUES (%s, %s, %s, %s, 'pending', %s)
+                         RETURNING id""",
+                      (tool_name.strip(), source, raw_data, category, datetime.now()))
+            staging_id = c.fetchone()[0]
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"[Vault] Error saving staging tool '{tool_name}': {e}")
+            staging_id = -1
+        finally:
+            conn.close()
+        return staging_id
+
+    def update_staging_processed(self, tool_name: str, processed_data: str,
+                                  trust_score: float, category: str,
+                                  embedding_bytes: Optional[bytes] = None,
+                                  processing_log: str = ''):
+        """
+        Updates a staging tool with processed data from the local AI processor.
+        Sets status to 'processed' (ready for review).
+        """
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        embedding_vector = None
+        if embedding_bytes:
+            embedding_vector = np.frombuffer(embedding_bytes, dtype=np.float32).tolist()
+        
+        c.execute("""UPDATE staging_tools SET
+                        processed_data = %s,
+                        trust_score = %s,
+                        category = %s,
+                        embedding = %s,
+                        embedding_blob = %s,
+                        processing_status = 'processed',
+                        processing_log = %s,
+                        processed_at = %s
+                     WHERE lower(tool_name) = %s""",
+                  (processed_data, trust_score, category, embedding_vector,
+                   psycopg2.Binary(embedding_bytes) if embedding_bytes else None,
+                   processing_log, datetime.now(), tool_name.lower()))
+        conn.commit()
+        conn.close()
+        print(f"[Vault] Staging tool '{tool_name}' processed and ready for review.")
+
+    def get_staging_queue(self, status: str = 'processed', limit: int = 100) -> List[Dict]:
+        """
+        Returns staging tools with the given processing status.
+        Default: 'processed' (ready for human review).
+        """
+        conn = self._get_conn()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("""SELECT id, tool_name, source, raw_data, processed_data, trust_score,
+                            category, processing_status, processing_log,
+                            ingested_at, processed_at, reviewed_at, reviewer_notes
+                     FROM staging_tools
+                     WHERE processing_status = %s
+                     ORDER BY processed_at DESC NULLS LAST, ingested_at DESC
+                     LIMIT %s""", (status, limit))
+        rows = c.fetchall()
+        conn.close()
+        
+        results = []
+        for row in rows:
+            d = dict(row)
+            for ts_field in ('ingested_at', 'processed_at', 'reviewed_at'):
+                if d.get(ts_field):
+                    d[ts_field] = d[ts_field].isoformat()
+            # Parse processed_data JSON if exists
+            if d.get('processed_data'):
+                try:
+                    d['analysis'] = json.loads(d['processed_data'])
+                except Exception:
+                    d['analysis'] = {}
+            else:
+                d['analysis'] = {}
+            results.append(d)
+        return results
+
+    def approve_staging_tool(self, staging_id: int, trust_score: float = None,
+                              executive_summary: str = None, category: str = None,
+                              reviewer_notes: str = '') -> Optional[str]:
+        """
+        Moves a tool from staging to verified_tools (live).
+        Allows optional overrides for trust_score, summary, and category.
+        Returns the tool_name if successful, None otherwise.
+        """
+        conn = self._get_conn()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Get the staging tool
+        c.execute("SELECT * FROM staging_tools WHERE id = %s", (staging_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return None
+        
+        tool_name = row['tool_name']
+        final_score = trust_score if trust_score is not None else (row['trust_score'] or 70.0)
+        
+        # Parse processed data
+        analysis_dict = {}
+        if row['processed_data']:
+            try:
+                analysis_dict = json.loads(row['processed_data'])
+            except Exception:
+                pass
+        
+        # Apply overrides
+        if executive_summary is not None:
+            analysis_dict['executive_summary'] = executive_summary
+        if category is not None:
+            if 'job_to_be_done' not in analysis_dict:
+                analysis_dict['job_to_be_done'] = []
+            analysis_dict['job_to_be_done'] = [category] + [
+                j for j in analysis_dict.get('job_to_be_done', []) if j != category
+            ]
+        
+        analysis_json = json.dumps(analysis_dict, ensure_ascii=False)
+        
+        # Build embedding data
+        embedding_blob = bytes(row['embedding_blob']) if row.get('embedding_blob') else None
+        embedding_vector = None
+        if embedding_blob:
+            embedding_vector = np.frombuffer(embedding_blob, dtype=np.float32).tolist()
+        
+        timestamp = datetime.now()
+        intent_category = category or row.get('category', 'General')
+        
+        # Upsert into verified_tools
+        c2 = conn.cursor()
+        c2.execute('''INSERT INTO verified_tools 
+                     (tool_name, last_updated, trust_score, intent_category, analysis_json, 
+                      gallery_json, embedding_json, embedding_blob, is_active, embedding)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     ON CONFLICT (tool_name) DO UPDATE SET
+                         last_updated = EXCLUDED.last_updated,
+                         trust_score = EXCLUDED.trust_score,
+                         intent_category = EXCLUDED.intent_category,
+                         analysis_json = EXCLUDED.analysis_json,
+                         embedding_blob = EXCLUDED.embedding_blob,
+                         is_active = EXCLUDED.is_active,
+                         embedding = EXCLUDED.embedding''',
+                  (tool_name.lower(), timestamp, final_score, intent_category, analysis_json,
+                   '[]', None, 
+                   psycopg2.Binary(embedding_blob) if embedding_blob else None,
+                   1, embedding_vector))
+        
+        # Audit log
+        c2.execute('''INSERT INTO audit_history (tool_name, timestamp, action, reason, score_snapshot)
+                     VALUES (%s, %s, %s, %s, %s)''',
+                  (tool_name.lower(), timestamp, "Staging Pipeline Approval",
+                   f"Approved from staging pipeline. {reviewer_notes}", final_score))
+        
+        # Update search index
+        c2.execute("DELETE FROM search_index WHERE tool_name = %s", (tool_name.lower(),))
+        keywords = set()
+        keywords.add(tool_name.lower())
+        keywords.update(w.lower() for w in tool_name.split())
+        for job in analysis_dict.get('job_to_be_done', []):
+            keywords.update(w.lower() for w in job.split())
+        for kw in keywords:
+            c2.execute("""INSERT INTO search_index (tool_name, keyword) VALUES (%s, %s)
+                         ON CONFLICT (tool_name, keyword) DO NOTHING""", 
+                      (tool_name.lower(), kw.strip().lower()))
+        
+        # Mark staging as approved
+        c2.execute("""UPDATE staging_tools SET 
+                        processing_status = 'approved', 
+                        reviewed_at = %s, 
+                        reviewer_notes = %s,
+                        trust_score = %s
+                     WHERE id = %s""",
+                  (timestamp, reviewer_notes, final_score, staging_id))
+        
+        conn.commit()
+        conn.close()
+        print(f"[Vault] Staging tool '{tool_name}' approved and published to live Vault.")
+        return tool_name
+
+    def reject_staging_tool(self, staging_id: int, reviewer_notes: str = '') -> Optional[str]:
+        """
+        Marks a staging tool as rejected.
+        Does NOT delete it — keeps for analytics.
+        Returns tool_name if found, None otherwise.
+        """
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        c.execute("SELECT tool_name FROM staging_tools WHERE id = %s", (staging_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return None
+        
+        tool_name = row[0]
+        c.execute("""UPDATE staging_tools SET 
+                        processing_status = 'rejected',
+                        reviewed_at = %s,
+                        reviewer_notes = %s
+                     WHERE id = %s""",
+                  (datetime.now(), reviewer_notes, staging_id))
+        conn.commit()
+        conn.close()
+        print(f"[Vault] Staging tool '{tool_name}' rejected.")
+        return tool_name
+
+    def approve_staging_batch(self, staging_ids: List[int]) -> List[str]:
+        """
+        Batch-approve multiple staging tools at once.
+        Returns list of approved tool names.
+        """
+        approved = []
+        for sid in staging_ids:
+            result = self.approve_staging_tool(sid)
+            if result:
+                approved.append(result)
+        return approved
+
+    def reject_staging_batch(self, staging_ids: List[int], reason: str = '') -> List[str]:
+        """
+        Batch-reject multiple staging tools at once.
+        Returns list of rejected tool names.
+        """
+        rejected = []
+        for sid in staging_ids:
+            result = self.reject_staging_tool(sid, reviewer_notes=reason)
+            if result:
+                rejected.append(result)
+        return rejected
+
+    def edit_staging_tool(self, staging_id: int, trust_score: float = None,
+                           executive_summary: str = None, category: str = None) -> bool:
+        """
+        Quick-edit a staging tool's key fields before approval.
+        Only modifies the processed_data JSON and trust_score.
+        """
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        c.execute("SELECT processed_data FROM staging_tools WHERE id = %s", (staging_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return False
+        
+        analysis = {}
+        if row[0]:
+            try:
+                analysis = json.loads(row[0])
+            except Exception:
+                pass
+        
+        if executive_summary is not None:
+            analysis['executive_summary'] = executive_summary
+        if category is not None:
+            analysis['job_to_be_done'] = [category] + [
+                j for j in analysis.get('job_to_be_done', []) if j != category
+            ]
+        
+        updates = ["processed_data = %s"]
+        values = [json.dumps(analysis, ensure_ascii=False)]
+        
+        if trust_score is not None:
+            updates.append("trust_score = %s")
+            values.append(trust_score)
+        if category is not None:
+            updates.append("category = %s")
+            values.append(category)
+        
+        values.append(staging_id)
+        c.execute(f"UPDATE staging_tools SET {', '.join(updates)} WHERE id = %s", values)
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_staging_stats(self) -> Dict:
+        """Returns counts for each staging status."""
+        conn = self._get_conn()
+        c = conn.cursor()
+        
+        stats = {}
+        for status in ('pending', 'processed', 'approved', 'rejected'):
+            c.execute("SELECT COUNT(*) FROM staging_tools WHERE processing_status = %s", (status,))
+            stats[status] = c.fetchone()[0]
+        
+        c.execute("SELECT COUNT(*) FROM staging_tools")
+        stats['total'] = c.fetchone()[0]
+        
+        # Today's activity
+        c.execute("""SELECT COUNT(*) FROM staging_tools 
+                     WHERE processing_status = 'approved' 
+                     AND reviewed_at >= CURRENT_DATE""")
+        stats['approved_today'] = c.fetchone()[0]
+        
+        conn.close()
+        return stats

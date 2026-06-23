@@ -518,6 +518,19 @@ async def scout_task_wrapper(intent: str):
     """
     print(f"[Background] Starting ScoutAgent.run_discovery_cycle for: {intent}")
     try:
+        from semantic_cache import AetherSemanticCache
+        from local_embedder import LocalEmbeddingEngine
+        from persistence import AetherVault
+        
+        vault = AetherVault()
+        embedder = LocalEmbeddingEngine.get_instance()
+        semantic_cache = AetherSemanticCache(embedder, vault)
+        
+        cached_tool = semantic_cache.check_cache(intent)
+        if cached_tool:
+            print(f"[Background] ScoutAgent discovery bypassed due to semantic cache hit for '{intent}'.")
+            return
+            
         scout = ScoutAgent()
         results = await scout.run_discovery_cycle(intent)
         print(f"[Background] ScoutAgent cycle complete. Found {len(results)} tools.")
@@ -884,6 +897,91 @@ def get_live_scans():
 def reject_tool(tool_name: str):
     vault.delete_tool(tool_name)
     return {"status": "success", "message": f"Tool '{tool_name}' was rejected and removed."}
+
+# --- Staging Pipeline Endpoints ---
+
+@app.get("/admin/staging/queue", dependencies=[Depends(verify_admin_user)])
+def get_staging_queue(status: str = "processed", limit: int = 100):
+    """
+    Returns staging tools with the given status.
+    Default: 'processed' (ready for human review).
+    Also accepts: 'pending', 'approved', 'rejected'
+    """
+    return vault.get_staging_queue(status=status, limit=limit)
+
+@app.get("/admin/staging/stats", dependencies=[Depends(verify_admin_user)])
+def get_staging_stats():
+    """Returns pipeline stats: pending, processed, approved, rejected counts."""
+    return vault.get_staging_stats()
+
+class StagingApprovePayload(BaseModel):
+    trust_score: Optional[float] = None
+    executive_summary: Optional[str] = None
+    category: Optional[str] = None
+    reviewer_notes: str = ""
+
+@app.post("/admin/staging/approve/{staging_id}", dependencies=[Depends(verify_admin_user)])
+def approve_staging(staging_id: int, payload: StagingApprovePayload = None):
+    """
+    Approves a staging tool and moves it to the live Vault.
+    Supports optional overrides for trust_score, summary, and category.
+    """
+    if payload is None:
+        payload = StagingApprovePayload()
+
+    result = vault.approve_staging_tool(
+        staging_id=staging_id,
+        trust_score=payload.trust_score,
+        executive_summary=payload.executive_summary,
+        category=payload.category,
+        reviewer_notes=payload.reviewer_notes
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Staging tool not found.")
+    return {"status": "success", "message": f"Tool '{result}' approved and is now live."}
+
+@app.post("/admin/staging/reject/{staging_id}", dependencies=[Depends(verify_admin_user)])
+def reject_staging(staging_id: int, reason: str = ""):
+    """Rejects a staging tool (keeps it in DB for analytics)."""
+    result = vault.reject_staging_tool(staging_id, reviewer_notes=reason)
+    if not result:
+        raise HTTPException(status_code=404, detail="Staging tool not found.")
+    return {"status": "success", "message": f"Tool '{result}' rejected."}
+
+class StagingBatchPayload(BaseModel):
+    staging_ids: List[int]
+    reason: str = ""
+
+@app.post("/admin/staging/approve-batch", dependencies=[Depends(verify_admin_user)])
+def approve_staging_batch(payload: StagingBatchPayload):
+    """Batch-approve multiple staging tools at once."""
+    approved = vault.approve_staging_batch(payload.staging_ids)
+    return {"status": "success", "approved": approved, "count": len(approved)}
+
+@app.post("/admin/staging/reject-batch", dependencies=[Depends(verify_admin_user)])
+def reject_staging_batch(payload: StagingBatchPayload):
+    """Batch-reject multiple staging tools at once."""
+    rejected = vault.reject_staging_batch(payload.staging_ids, reason=payload.reason)
+    return {"status": "success", "rejected": rejected, "count": len(rejected)}
+
+class StagingEditPayload(BaseModel):
+    trust_score: Optional[float] = None
+    executive_summary: Optional[str] = None
+    category: Optional[str] = None
+
+@app.put("/admin/staging/edit/{staging_id}", dependencies=[Depends(verify_admin_user)])
+def edit_staging(staging_id: int, payload: StagingEditPayload):
+    """Quick-edit trust score, summary, and category before approval."""
+    success = vault.edit_staging_tool(
+        staging_id=staging_id,
+        trust_score=payload.trust_score,
+        executive_summary=payload.executive_summary,
+        category=payload.category
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Staging tool not found.")
+    return {"status": "success", "message": "Staging tool updated."}
+
 
 @app.post("/admin/vault/toggle/{name}", dependencies=[Depends(verify_admin_user)])
 async def toggle_tool_active(name: str, active: bool, admin_email: str = Depends(verify_admin_user)):
@@ -1342,7 +1440,23 @@ def get_admin_logs(lines: int = 50, log_type: str = "tasks", admin_email: str = 
         return {"error": str(e)}
 
 @app.websocket("/ws/logs")
-async def websocket_logs(websocket: WebSocket):
+async def websocket_logs(websocket: WebSocket, token: str = None):
+    # Perform validation
+    is_valid = False
+    if token:
+        try:
+            # verify_admin_user expects "Bearer <token>" format. We pass websocket as the request parameter
+            verify_admin_user(authorization=f"Bearer {token}", request=websocket)
+            is_valid = True
+        except Exception as e:
+            print(f"[WS AUTH FAIL] WebSocket token verification failed: {e}")
+            
+    if not is_valid:
+        # Accept first to properly send the close code (standard WebSocket handshake behavior)
+        await websocket.accept()
+        await websocket.close(code=1008) # Policy Violation
+        return
+
     await log_streamer.connect(websocket)
     try:
         while True:
@@ -1373,7 +1487,7 @@ class GemmaBatchUpload(BaseModel):
     verified_items: List[Dict]
     rejected_items: List[Dict]
 
-def _verify_worker_key(authorization: str = Header(None)) -> str:
+def _verify_worker_key(request: Request, authorization: str = Header(None)) -> str:
     """
     Accepts either:
       - Bearer <firebase_token> (admin browser)
@@ -1391,7 +1505,7 @@ def _verify_worker_key(authorization: str = Header(None)) -> str:
 
     # Option 2: Firebase Bearer token (admin dashboard)
     if authorization.startswith("Bearer "):
-        return verify_admin_user(authorization)
+        return verify_admin_user(authorization, request=request)
 
     raise HTTPException(status_code=401, detail="Invalid Authorization format")
 

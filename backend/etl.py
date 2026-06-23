@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import random
 import praw
 from github import Github
 from openai import AsyncOpenAI
@@ -34,7 +35,7 @@ TOOL_CONFIGS = [
 ]
 
 async def extract_intent_llm(text: str, tool_name: str) -> dict:
-    """Passes raw text to LLM to extract intent and success score, enforcing JSON."""
+    """Passes raw text to LLM to extract intent and success score, enforcing JSON with retry logic."""
     if not os.getenv("OPENAI_API_KEY"):
         return {"intent": f"Mock intent for {tool_name} (No API Key)", "success_score": 8}
         
@@ -46,21 +47,35 @@ Output strictly as a valid JSON object: {{"intent": "...", "success_score": 8}}.
 Text:
 "{text}"
 """
-    try:
-        response = await openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a precise data extractor."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.0
-        )
-        content = response.choices[0].message.content
-        return json.loads(content)
-    except Exception as e:
-        print(f"Error during LLM extraction for {tool_name}: {e}")
-        return {"intent": None, "success_score": None}
+    attempt = 1
+    max_retries = 5
+    delay = 2.0
+    while attempt <= max_retries:
+        try:
+            response = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a precise data extractor."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.0
+            )
+            content = response.choices[0].message.content
+            return json.loads(content)
+        except Exception as e:
+            err_str = str(e).lower()
+            is_retryable = any(kw in err_str or kw in type(e).__name__.lower()
+                               for kw in ["429", "rate", "limit", "quota", "overloaded", "temp", "unavailable", "timeout", "503", "500"])
+            if is_retryable and attempt < max_retries:
+                wait_time = delay * random.uniform(0.8, 1.2)
+                print(f"OpenAI API error ({e}). Retrying in {wait_time:.2f} seconds (Attempt {attempt}/{max_retries})...")
+                await asyncio.sleep(wait_time)
+                delay *= 2.0
+                attempt += 1
+            else:
+                print(f"Error during OpenAI LLM extraction for {tool_name}: {e}")
+                return {"intent": None, "success_score": None}
 
 def fetch_reddit_data(tool_name: str, subreddits: list, limit=3):
     """Fetches top posts/comments from Reddit for a given tool."""

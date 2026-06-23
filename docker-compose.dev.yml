@@ -35,13 +35,17 @@ services:
     ports:
       # Port 8001 to avoid conflict with production backend (8000)
       - "8001:8000"
+    depends_on:
+      - db
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://aether_user:aether_password@db:5432/aether_db
     volumes:
       # Mount backend source for live editing
       - ./backend:/app
-      # Persist SQLite database
-      - ./backend/vault.db:/app/vault.db
+      # Persist SQLite database (legacy, commented out)
+      # - ./backend/vault.db:/app/vault.db
     # Hot-reload: uvicorn watches for file changes
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
     restart: unless-stopped
@@ -51,6 +55,22 @@ services:
       timeout: 10s
       retries: 3
 
+  # ── Database with pgvector ────────────────────────────────
+  db:
+    image: ankane/pgvector:latest
+    container_name: aether-db-dev
+    environment:
+      POSTGRES_DB: aether_db
+      POSTGRES_USER: aether_user
+      POSTGRES_PASSWORD: aether_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   devbox-data:
     name: aether-devbox-data
+  pgdata-dev:
+    name: aether-pgdata-dev

@@ -47,8 +47,8 @@ Required JSON Structure:
 DO NOT wrap the response in markdown blocks (e.g., ```json). Return ONLY the raw JSON string.
 """
 
-from google import genai
 from google.genai import types
+from llm_client import SafeGenAIClient
 
 async def analyze_tool_with_gemini(tool_info: str):
     print(f"Analyzing: {tool_info[:50]}...")
@@ -56,48 +56,24 @@ async def analyze_tool_with_gemini(tool_info: str):
     if not api_key:
         raise ValueError("Missing GOOGLE_API_KEY or GEMINI_API_KEY")
 
-    client = genai.Client(api_key=api_key)
-    
+    client = SafeGenAIClient(api_key=api_key)
     prompt = f"Analyze the following AI tool information:\n\n{tool_info}"
     
-    attempt = 1
-    base_wait = 5
-    max_wait = 60
-    while attempt <= 7:
-        try:
-            print(f"Attempting to call Gemini API (attempt {attempt})...")
-            # Using synchronous call in a thread for the new SDK just in case async client is tricky
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    temperature=0.1,
-                    response_mime_type="application/json"
-                )
-            )
-            print("Successfully received Gemini response.")
-            break
-        except Exception as e:
-            if "429" in str(e) or "Quota" in str(e) or "ResourceExhausted" in type(e).__name__:
-                wait_time = min(base_wait * (2 ** (attempt - 1)), max_wait)
-                print(f"Rate limit hit (429). Exponential Backoff: Waiting {wait_time} seconds before retry {attempt}...")
-                await asyncio.sleep(wait_time)
-                attempt += 1
-            else:
-                print(f"Failed Gemini call with non-rate-limit error: {e}")
-                return None
-    
-    if attempt > 7:
-        print("Max retries reached for Gemini call.")
-        return None
-    
     try:
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                temperature=0.1,
+                response_mime_type="application/json"
+            )
+        )
+        print("Successfully received Gemini response.")
         data = json.loads(response.text)
         return data
-    except json.JSONDecodeError as e:
-        print(f"Failed to decode JSON from Gemini: {e}\nResponse: {response.text}")
+    except Exception as e:
+        print(f"Failed Gemini call: {e}")
         return None
 
 async def process_single_tool(tool_raw_info: str, vault: AetherVault, semaphore: asyncio.Semaphore):

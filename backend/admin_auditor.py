@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 import httpx
 from ddgs import DDGS
 from pydantic import BaseModel, Field
-from google import genai
 from google.genai import types
+from llm_client import SafeGenAIClient
 
 class VaultAuditorResult(BaseModel):
     name: str = Field(description="The formal name of the AI tool.")
@@ -58,7 +58,7 @@ async def run_lean_audit(url: str):
     if not api_key:
         return {"status": "error", "reason": "GEMINI_API_KEY not found"}
 
-    client = genai.Client(api_key=api_key)
+    client = SafeGenAIClient(api_key=api_key)
     
     prompt = f"""
     You are a 'Cynical Tech Auditor'. Your mission is to evaluate AI tools based on limited scraped data and community chatter.

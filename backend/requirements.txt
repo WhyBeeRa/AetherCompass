@@ -14,3 +14,7 @@ google-genai
 psutil
 pyyaml
 apscheduler
+psycopg2-binary
+pgvector
+sentence-transformers
+ollama

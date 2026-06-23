@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 import httpx
 from ddgs import DDGS
 from pydantic import BaseModel, Field
-from google import genai
 from google.genai import types
+from llm_client import SafeGenAIClient
 
 class DeepAuditorResult(BaseModel):
     name: str = Field(description="The formal name of the AI tool.")
@@ -133,7 +133,7 @@ async def run_deep_audit_stream(url: str):
         yield json.dumps({"type": "error", "message": "GEMINI_API_KEY not found in environment."}) + "\n"
         return
 
-    client = genai.Client(api_key=api_key)
+    client = SafeGenAIClient(api_key=api_key)
     
     prompt = f"""
     Role: You are Aether's Lead Auditor, a highly cynical, objective, and deeply technical AI strategist. Your goal is to protect enterprise clients from marketing fluff.

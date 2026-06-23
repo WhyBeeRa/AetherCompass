@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+bower_components/
+
+# Build and binaries
+build/
+dist/
+out/
+bin/
+*.so
+*.exe
+*.dll
+*.o
+
+# Caches and version control history
+.git/
+.cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Local databases and logs
+*.db
+*.sqlite
+*.log
+*.tmp

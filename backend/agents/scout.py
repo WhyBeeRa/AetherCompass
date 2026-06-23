@@ -6,9 +6,9 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from models import ScoutFindings, VisualProof
-from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from llm_client import SafeGenAIClient
 try:
     from logger_utils import log_terminal
 except ImportError:
@@ -56,7 +56,7 @@ class ScoutAgent:
             print("WARNING: GEMINI_API_KEY is missing. ScoutAgent is disabled.")
             self.client = None
         else:
-            self.client = genai.Client(api_key=api_key)
+            self.client = SafeGenAIClient(api_key=api_key)
 
         # Unique User-Agent to avoid Reddit 429 errors
         self.headers = {

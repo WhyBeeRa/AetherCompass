@@ -4,9 +4,9 @@ import json
 from datetime import datetime
 from typing import List, Dict
 from models import ScoutFindings, LabAnalysis, ToolMetrics, VisualQuality, IntentMapping
-from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from llm_client import SafeGenAIClient
 
 load_dotenv()
 
@@ -53,7 +53,7 @@ class ClassifierAgent:
             print("WARNING: GEMINI_API_KEY is missing. ClassifierAgent is disabled.")
             self.client = None
         else:
-            self.client = genai.Client(api_key=api_key)
+            self.client = SafeGenAIClient(api_key=api_key)
 
     async def _query_llm(self, prompt: str, findings: ScoutFindings) -> Dict:
         # Fallback data in case of error or missing client
@@ -74,8 +74,8 @@ class ClassifierAgent:
 
         full_prompt = f"{prompt}\n\nScout Findings:\n{findings.model_dump_json()}"
         try:
-            response = await asyncio.to_thread(
-                self.client.models.generate_content,
+            # Using the native async method of SafeGenAIClient with automatic retry & fallback
+            response = await self.client.aio.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=full_prompt,
                 config=types.GenerateContentConfig(

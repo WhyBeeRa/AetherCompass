@@ -3,7 +3,7 @@ import os
 import base64
 import firebase_admin
 from firebase_admin import credentials, auth
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -79,7 +79,7 @@ def initialize_firebase_admin():
 # Attempt initialization
 initialize_firebase_admin()
 
-def verify_admin_user(authorization: str = Header(None), x_admin_key: str = Header(None)) -> str:
+def verify_admin_user(authorization: str = Header(None), x_admin_key: str = Header(None), request: Request = None) -> str:
     """
     FastAPI Dependency that extracts the Firebase Bearer token,
     verifies it, checks if the email is an admin, and returns the email.
@@ -93,8 +93,19 @@ def verify_admin_user(authorization: str = Header(None), x_admin_key: str = Head
     # [TEMPORARY BYPASS] For local development only.
     # Allows bypassing Firebase auth on dev machines.
     if authorization == "Bearer dev-admin-token":
-        print("[AUTH] Using TEMPORARY ADMIN BYPASS for local development.")
-        return "admin@aethercompass.local"
+        # Environment/Local checks to ensure we don't bypass in production
+        is_development = os.getenv("ENVIRONMENT") == "development" or os.getenv("APP_ENV") == "development"
+        if not is_development and os.getenv("ENVIRONMENT") != "production" and os.getenv("APP_ENV") != "production":
+            if request is not None:
+                # Check request host context
+                is_development = request.url.hostname in ("localhost", "127.0.0.1", "testserver")
+            
+        if is_development:
+            print("[AUTH] Using TEMPORARY ADMIN BYPASS for local development.")
+            return "admin@aethercompass.local"
+        else:
+            print("[AUTH SECURITY WARNING] Blocked dev-admin-token bypass attempt in production environment.")
+            raise HTTPException(status_code=401, detail="Unauthorized bypass token in production")
 
     if not authorization or not authorization.startswith("Bearer "):
         print(f"[AUTH] Missing or malformed Authorization header. Got: {repr(authorization[:30]) if authorization else 'None'}")

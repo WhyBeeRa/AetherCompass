@@ -1,16 +1,13 @@
 """
-AetherSearchEngine — Zero-API Local Semantic Search
+AetherSearchEngine — Production-ready Database Vector Search
 =====================================================
-Pure local cosine similarity search using FastEmbed vectors.
-NO Gemini API calls. NO external network requests during search.
-
-Flow:
-  1. Receive query → embed locally (~5ms)
-  2. Load all tool vectors from SQLite
-  3. Cosine similarity + Trust Score weighting
-  4. Return top 5 results with match_reason from stored data
+Semantic search powered by PostgreSQL + pgvector.
+Runs search, filtering, and combined-score ranking entirely in the database.
 """
 import numpy as np
+import json
+import psycopg2
+import psycopg2.extras
 from typing import List, Dict
 
 from persistence import AetherVault
@@ -24,69 +21,65 @@ class AetherSearchEngine:
 
     async def semantic_search(self, query: str, limit: int = 5) -> List[Dict]:
         """
-        Zero-API Semantic Search:
+        Production Vector Search:
         1. Check if embedder is ready.
-        2. Embed query locally via FastEmbed (~5ms).
-        3. Cosine similarity against all stored tool vectors.
-        4. Weighted ranking: 0.7 * similarity + 0.3 * trust_score.
-        5. Return top results with match_reason from stored data
+        2. Embed query via Gemini Remote Embeddings API.
+        3. Query PostgreSQL using the cosine distance operator <=> and combined score logic in SQL.
+        4. Return top results.
         """
         # 0. CHECK IF ENGINE IS READY
         if not self.embedder.is_ready():
             raise RuntimeError("System initializing")
 
-        # 1. EMBED QUERY LOCALLY
+        # 1. EMBED QUERY
         query_vector = self.embedder.embed(query)
-        q_norm = np.linalg.norm(query_vector)
-
-        if q_norm == 0:
+        if query_vector is None or len(query_vector) == 0 or np.linalg.norm(query_vector) == 0:
             return []
 
-        # 2. LOAD ALL TOOL VECTORS FROM DB
-        #    Returns: List[(tool_name, trust_score, vector, analysis_dict, is_active)]
-        # We need to update persistence to return is_active if it doesn't
-        all_tools = self.vault.get_all_embeddings()
+        # Convert to list for pgvector parameter passing
+        query_list = query_vector.tolist()
 
-        if not all_tools:
-            # Fallback to keyword search if no embeddings exist yet
+        # 2. RUN VECTOR SIMILARITY QUERY DIRECTLY IN POSTGRES
+        conn = self.vault._get_conn()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            # Cosine similarity = 1 - cosine distance (operator <=>)
+            # Combined score: 70% similarity + 30% normalized trust score
+            c.execute("""
+                SELECT tool_name, trust_score, analysis_json, is_active,
+                       (1 - (embedding <=> %s::vector)) as similarity,
+                       (0.7 * (1 - (embedding <=> %s::vector)) + 0.3 * (trust_score / 100.0)) as combined_score
+                FROM verified_tools
+                WHERE is_active = 1 AND embedding IS NOT NULL AND (1 - (embedding <=> %s::vector)) >= 0.20
+                ORDER BY combined_score DESC
+                LIMIT %s
+            """, (query_list, query_list, query_list, limit))
+            rows = c.fetchall()
+        except Exception as e:
+            print(f"[Search Engine] DB error during vector search: {e}")
+            rows = []
+        finally:
+            conn.close()
+
+        if not rows:
+            # Fallback to keyword search if no results found or DB error/no vectors
             return self._keyword_fallback(query, limit)
 
-        # 3. COSINE SIMILARITY + TRUST SCORE WEIGHTING
-        scored = []
-        for tool_name, trust_score, tool_vector, analysis, is_active in all_tools:
-            t_norm = np.linalg.norm(tool_vector)
-            
-            if q_norm == 0 or t_norm == 0:
-                continue
-                
-            dot_prod = np.dot(query_vector, tool_vector)
-            similarity = float(dot_prod / (q_norm * t_norm))
-
-            # Weighted score: 70% semantic match + 30% trust
-            # trust_score is 0-100, normalize to 0-1
-            combined_score = 0.7 * similarity + 0.3 * (trust_score / 100.0)
-
-            scored.append((combined_score, similarity, tool_name, trust_score, analysis, is_active))
-
-        # 4. SORT & TOP LIMIT
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top_results = scored[:limit]
-
-        # 5. FORMAT RESPONSE (same API contract as before)
+        # 3. FORMAT RESPONSE
         formatted = []
-        for combined, sim, tool_name, trust_score, analysis, is_active in top_results:
-            # Only return tools with meaningful similarity (filter noise)
-            if sim < 0.20:
-                continue
+        for row in rows:
+            tool_name = row['tool_name']
+            trust_score = row['trust_score']
+            analysis_json = row['analysis_json']
+            analysis = json.loads(analysis_json) if analysis_json else {}
+            sim = row['similarity']
+            combined = row['combined_score']
+            is_active = row['is_active']
 
             slug_id = tool_name.strip().lower().replace(' ', '-')
-
-            # Build match_reason from pre-stored data (no LLM needed)
             summary = analysis.get("executive_summary", "")
             jobs = analysis.get("job_to_be_done", [])
             match_reason = summary if summary else (", ".join(jobs) if jobs else "Semantic match")
-
-            # Primary intent from first job_to_be_done
             primary_intent = jobs[0] if jobs else "AI Tool"
 
             formatted.append({
@@ -137,4 +130,3 @@ class AetherSearchEngine:
                 "is_active": r.get("is_active", True)
             })
         return fallback
-
